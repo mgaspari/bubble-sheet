@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>bubble-sheet — minimal quiz example</title>
+    <link rel="icon" href="data:," />
+
+    <!-- In your app: import "bubble-sheet/styles.css" -->
+    <link rel="stylesheet" href="../dist/bubble-sheet.css" />
+
+    <!--
+      Deliberately plain page styling: this example shows the integration,
+      not the form chrome. See demo/ for the full printed-form treatment.
+    -->
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        padding: 40px 16px;
+        background: #f2f1ec;
+        color: #23241f;
+        font: 15px/1.5 system-ui, sans-serif;
+      }
+      main { max-width: 560px; margin: 0 auto; display: grid; gap: 24px; }
+      h1 { margin: 0; font-size: 22px; }
+      .fields { display: flex; flex-wrap: wrap; gap: 24px; }
+      button {
+        justify-self: start;
+        padding: 10px 22px;
+        border: 1px solid #23241f;
+        border-radius: 2px;
+        background: #23241f;
+        color: #f2f1ec;
+        font: 600 14px system-ui, sans-serif;
+        cursor: pointer;
+      }
+      button:focus-visible { outline: 2px solid #b4322a; outline-offset: 2px; }
+      #result { margin: 0; font-weight: 600; }
+      pre {
+        margin: 0;
+        padding: 12px;
+        background: #e7e5dd;
+        border-radius: 2px;
+        font-size: 12px;
+        overflow-x: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Pop Quiz</h1>
+
+      <div class="fields">
+        <div id="student-name"></div>
+        <div id="student-id"></div>
+      </div>
+
+      <div id="quiz"></div>
+
+      <button id="submit">Submit</button>
+      <p id="result"></p>
+      <pre id="payload" hidden></pre>
+    </main>
+
+    <script type="module">
+      // In your app: import { mount, mountGrid, score } from "bubble-sheet";
+      import { mount, mountGrid, score } from "../dist/esm/index.js";
+
+      const ANSWER_KEY = { 1: "C", 2: "A", 3: "D", 4: "B", 5: "E",
+                           6: "C", 7: "A", 8: "B", 9: "D", 10: "C" };
+
+      // Header fields: cells x charset.
+      const name = mountGrid("#student-name", {
+        cells: 12,
+        charset: "letters",
+        caption: "Name",
+      });
+      const id = mountGrid("#student-id", {
+        cells: 6,
+        charset: "digits",
+        caption: "Student ID",
+      });
+
+      // The answer block, with the draft autosaved as the student works.
+      const quiz = mount("#quiz", {
+        questions: 10,
+        columns: 1,
+        value: JSON.parse(localStorage.getItem("quiz-draft") ?? "{}"),
+        onChange: (value) => localStorage.setItem("quiz-draft", JSON.stringify(value)),
+      });
+
+      const result = document.querySelector("#result");
+      const payload = document.querySelector("#payload");
+
+      document.querySelector("#submit").addEventListener("click", () => {
+        if (!quiz.sheet.complete) {
+          result.textContent =
+            `Answer all questions — ${quiz.sheet.questions - quiz.sheet.answered} left.`;
+          return;
+        }
+        quiz.disabled = true; // lock the sheet once it is handed in
+
+        const graded = score(quiz.value, ANSWER_KEY);
+        result.textContent =
+          `${name.text || "Anonymous"}: ${graded.correct}/${graded.total} ` +
+          `(${Math.round(graded.percent * 100)}%)`;
+
+        // In your app this body goes to your server:
+        //   fetch("/api/submissions", { method: "POST", body: JSON.stringify(...) })
+        payload.hidden = false;
+        payload.textContent = JSON.stringify(
+          { name: name.text, id: id.text, answers: quiz.value, score: graded.correct },
+          null,
+          2,
+        );
+        localStorage.removeItem("quiz-draft");
+      });
+    </script>
+  </body>
+</html>

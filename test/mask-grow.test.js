@@ -123,8 +123,8 @@ test("growth stops at max and starts at min", () => {
 });
 
 test("setting shorter text shrinks the field back", () => {
-  const field = mountGrid(host, { grow: { min: 2, max: 12 }, text: "GASPARI" });
-  assert.equal(cellCount(field), 8);
+  const field = mountGrid(host, { grow: { min: 2, max: 12 }, text: "LOVELACE" });
+  assert.equal(cellCount(field), 9);
   field.text = "LI";
   assert.equal(cellCount(field), 3);
   assert.equal(field.text, "LI");

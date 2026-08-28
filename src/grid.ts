@@ -55,7 +55,7 @@ export interface GridFieldOptions
   text?: string;
   /**
    * `name` for a hidden input carrying the field's text, so a plain `<form>`
-   * post sends `"GASPARI"` rather than a dozen radio groups.
+   * post sends `"LOVELACE"` rather than a dozen radio groups.
    */
   name?: string;
   /** Called after every change, with the field's text. */
@@ -101,7 +101,7 @@ let uid = 0;
  * const name = mountGrid("#name", { cells: 12, charset: "letters", caption: "Name" });
  * const id = mountGrid("#id", { cells: 8, charset: "digits", caption: "Student ID" });
  * const date = mountGrid("#date", { mask: "99/99/9999", caption: "Date" });
- * name.text = "GASPARI";
+ * name.text = "LOVELACE";
  * ```
  *
  * Typing in a box fills that column's bubble and moves to the next box;

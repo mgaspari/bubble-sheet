@@ -27,6 +27,9 @@ npm start        # → http://localhost:5173
 That serves `demo/`: a full form — name and ID grid-ins, fifty questions, a
 reader head that sweeps the page. `npm start` builds first if `dist/` is
 missing or stale, so a fresh clone works from those two commands alone.
+A minimal integration — the code you would actually write in an app — is at
+[`examples/quiz.html`](examples/quiz.html), served at
+`/examples/quiz.html`.
 
 Opening `demo/index.html` straight off the filesystem will *not* work, because
 browsers block ES modules over `file://`. The page says so if you try.
@@ -73,8 +76,8 @@ import { mountGrid } from "bubble-sheet";
 const name = mountGrid("#name", { cells: 12, charset: "letters", caption: "Name" });
 const id = mountGrid("#id", { cells: 8, charset: "digits", caption: "Student ID" });
 
-name.text = "GASPARI";     // paints the boxes and the bubbles
-id.text;                   // "40218837"
+name.text = "LOVELACE";    // paints the boxes and the bubbles
+id.text;                   // "18151210"
 ```
 
 Typing in a box fills that column's bubble and moves to the next box; filling a

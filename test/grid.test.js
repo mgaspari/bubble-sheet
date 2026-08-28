@@ -101,9 +101,9 @@ test("clicking a filled bubble erases the column", () => {
 
 test("text round-trips and trailing blanks are trimmed", () => {
   const field = mountGrid(host, { cells: 10 });
-  field.text = "GASPARI";
-  assert.equal(field.text, "GASPARI");
-  assert.deepEqual(field.value, { 1: "G", 2: "A", 3: "S", 4: "P", 5: "A", 6: "R", 7: "I" });
+  field.text = "LOVELACE";
+  assert.equal(field.text, "LOVELACE");
+  assert.deepEqual(field.value, { 1: "L", 2: "O", 3: "V", 4: "E", 5: "L", 6: "A", 7: "C", 8: "E" });
   field.text = "LI";
   assert.equal(field.text, "LI");
   assert.equal(boxes(field), "LI");
