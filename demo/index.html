@@ -20,6 +20,7 @@
           <div id="name-field"></div>
           <div id="id-field"></div>
           <div id="date-field"></div>
+          <div id="course-field"></div>
         </div>
 
         <div class="instructions">
@@ -128,6 +129,15 @@
         name: "test-date",
       });
 
+      // A mixed mask: letter cells, a printed dash, digit cells. Each cell
+      // offers only its own kind, so a digit in a letter box is refused.
+      const courseField = mountGrid("#course-field", {
+        mask: "AA-999",
+        caption: "Course",
+        name: "course-code",
+        text: "CS101",
+      });
+
       // Labeled choices: the bubble carries the value, the label sits beside.
       const scale = mount("#scale-q", {
         questions: 1,
@@ -182,6 +192,7 @@
         nameField.sheet.clearAll();
         idField.sheet.clearAll();
         dateField.sheet.clearAll();
+        courseField.sheet.clearAll();
         word.sheet.clearAll();
         scale.sheet.clearAll();
         sections.sheet.clearAll();
@@ -198,6 +209,7 @@
         nameField.disabled = true;
         idField.disabled = true;
         dateField.disabled = true;
+        courseField.disabled = true;
         word.disabled = true;
         scale.disabled = true;
         sections.disabled = true;
@@ -210,6 +222,7 @@
           nameField.disabled = false;
           idField.disabled = false;
           dateField.disabled = false;
+          courseField.disabled = false;
           word.disabled = false;
           scale.disabled = false;
           sections.disabled = false;
@@ -239,7 +252,8 @@
         readout.innerHTML = `
           <div><span class="k">name</span> ${nameField.text || "—"}
             <span class="k">id</span> ${idField.text || "—"}
-            <span class="k">date</span> ${dateField.text || "—"}</div>
+            <span class="k">date</span> ${dateField.text || "—"}
+            <span class="k">course</span> ${courseField.text || "—"}</div>
           <div><span class="k">rating</span> ${scale.sheet.selected(1).join("") || "—"}
             <span class="k">sections</span> ${sections.sheet.selected(1).join("") || "—"}
             <span class="k">word</span> ${word.text || "—"}</div>
