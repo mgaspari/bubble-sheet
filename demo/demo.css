@@ -263,8 +263,10 @@ body {
 .survey-q .bs-row:nth-child(5n) { border-bottom: 0; }
 .survey-q .bs-num, .survey-q .bs-timing { display: none; }
 
-/* The growing field stays compact: cells hug their content instead of
-   stretching to fill the row. */
+/* The growing field sits in the header flow, cells hugging their content and
+   growing rightward instead of stretching or being pushed aside. */
+#word-q { flex: 0 1 auto; }
+#word-q .bs-cells { justify-content: flex-start; }
 #word-q .bs-cell { flex: none; width: 21px; }
 
 /* Single-column fields hug their one cell instead of stretching. */

@@ -287,7 +287,7 @@ export class Sheet {
    * | `Home` `End` | first / last question |
    * | `PageUp` `PageDown` | move by `pageSize` |
    * | `Enter` | single-select: fill the cursor's oval and advance. Multi: advance |
-   * | `Space` | toggle the oval under the cursor |
+   * | `Space` | toggle the cursor's oval; on a `"columns"` sheet, blank the cell and advance |
    * | digits | jump to that question number (when `digitJump`) |
    * | `Escape` | drop a half-typed question number |
    */
@@ -350,7 +350,14 @@ export class Sheet {
         return true;
       case " ":
       case "Spacebar":
-        this.toggle(question, this.choices[choice]);
+        if (this.orientation === "columns") {
+          // In a field, space is a typewriter space: write a blank column and
+          // move on to the next cell.
+          this.clear(question);
+          this.setCursor(question + 1, choice);
+        } else {
+          this.toggle(question, this.choices[choice]);
+        }
         return true;
       case "Escape": {
         const pending = this.#digits.length > 0;

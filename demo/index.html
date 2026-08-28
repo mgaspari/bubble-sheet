@@ -22,6 +22,7 @@
           <div id="date-field"></div>
           <div id="course-field"></div>
           <div id="form-field"></div>
+          <div id="word-q"></div>
         </div>
 
         <div class="instructions">
@@ -45,10 +46,6 @@
           <div class="survey-q">
             <span class="survey-caption">Which sections did you attempt? Mark all that apply.</span>
             <div id="multi-q"></div>
-          </div>
-          <div class="survey-q">
-            <span class="survey-caption">One word for this exam. The field grows as you type.</span>
-            <div id="word-q"></div>
           </div>
         </div>
       </div>
@@ -167,7 +164,7 @@
       const word = mountGrid("#word-q", {
         charset: "letters",
         grow: { min: 1, max: 14 },
-        caption: "One word",
+        caption: "One word - grows as you type",
         name: "one-word",
       });
 

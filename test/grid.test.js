@@ -150,6 +150,30 @@ test("a column field walks cells sideways and characters downward", () => {
   assert.deepEqual(sheet.cursor, { question: 1, choice: 2 });
 });
 
+test("space on a columns sheet blanks the cell and advances", () => {
+  const sheet = new Sheet({
+    questions: 4,
+    choices: [..."ABCD"],
+    orientation: "columns",
+    value: { 1: "A", 2: "B" },
+  });
+  sheet.handleKey({ key: " " }); // cell 1: blanked, cursor moves on
+  assert.equal(sheet.get(1), undefined);
+  assert.equal(sheet.cursor.question, 2);
+  sheet.handleKey({ key: " " });
+  assert.deepEqual(sheet.value, {});
+  assert.equal(sheet.cursor.question, 3);
+});
+
+test("space on the bubbles of a field advances like in the boxes", () => {
+  const field = mountGrid(host, { cells: 5, text: "AB" });
+  const oval = field.element.querySelector('.bs-cell[data-cell="1"] input[value="A"]');
+  oval.focus();
+  press(oval, " ");
+  assert.equal(field.text, " B");
+  assert.equal(field.sheet.cursor.question, 2);
+});
+
 test("digitJump off leaves digit keys to the caller", () => {
   const sheet = new Sheet({ questions: 20, digitJump: false });
   assert.equal(sheet.handleKey({ key: "5" }), false);

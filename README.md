@@ -87,8 +87,9 @@ id.text;                   // "18151210"
 ```
 
 Typing in a box fills that column's bubble and moves to the next box; filling a
-bubble writes the character back into the box. `Space` blanks a column, which is
-how a last name is split from a first. `Backspace` clears the current cell, or
+bubble writes the character back into the box. `Space` blanks the column and
+moves to the next — a typewriter space, which is how a last name is split from
+a first; it works the same whether a box or a bubble holds focus. `Backspace` clears the current cell, or
 steps back and clears the previous one when it is already empty. `←` `→` walk
 the cells, and on the bubbles themselves `↑` `↓` walk the characters stacked in
 one column — the axes swap because the questions run sideways here
@@ -164,6 +165,7 @@ The flow is the point: click one oval, then keep your hands on the keys.
 | `PageUp` `PageDown` | move by `pageSize` (default 10) |
 | `Enter` | fill the oval under the cursor and advance |
 | `Space` | toggle the oval under the cursor |
+
 | digits | jump to that question — `4` `2` lands on 42 |
 | `Escape` | drop a half-typed question number |
 
