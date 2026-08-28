@@ -64,5 +64,13 @@
   },
   "engines": {
     "node": ">=18"
+  },
+  "homepage": "https://github.com/mgaspari/bubble-sheet#readme",
+  "bugs": {
+    "url": "https://github.com/mgaspari/bubble-sheet/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   }
 }

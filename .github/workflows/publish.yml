@@ -1,0 +1,31 @@
+# Publishes to npm when a GitHub release is published.
+#
+# One-time setup (no tokens, no secrets): on npmjs.com, package settings ->
+# Trusted Publishing -> add GitHub Actions publisher with
+#   repository: mgaspari/bubble-sheet, workflow: publish.yml.
+# For the very first publish the package must exist, so run `npm publish`
+# once locally (see README) or create the trusted publisher on the
+# "first-time publish" flow npmjs.com offers.
+name: Publish
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write # OIDC for npm trusted publishing + provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5+
+      - run: npm install -g npm@latest
+      - run: npm ci
+      - run: npm publish

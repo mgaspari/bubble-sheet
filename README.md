@@ -334,6 +334,21 @@ npm run build   # ESM + CJS + types + css into dist/
 npm run typecheck
 ```
 
+## Releasing
+
+The first publish is manual — the npm name is claimed by whoever runs it:
+
+```bash
+npm login          # once, with your npmjs.com account
+npm publish        # runs the full build + 82 tests first, then uploads
+```
+
+After that, releases go through CI: on npmjs.com, add a Trusted Publisher
+(package settings, GitHub Actions, repository `mgaspari/bubble-sheet`,
+workflow `publish.yml`) — then publishing a GitHub release runs the tests
+and publishes with provenance, no tokens stored anywhere. Bump `version`
+in package.json before tagging.
+
 ## Roadmap
 
 - `@bubble-sheet/react` — a `useSheet` hook and a `<BubbleSheet />` wrapping this
