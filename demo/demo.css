@@ -266,3 +266,7 @@ body {
 /* The growing field stays compact: cells hug their content instead of
    stretching to fill the row. */
 #word-q .bs-cell { flex: none; width: 21px; }
+
+/* Single-column fields hug their one cell instead of stretching. */
+#form-field { flex: none; }
+#form-field .bs-cell { flex: none; width: 21px; }
