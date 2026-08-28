@@ -1,4 +1,5 @@
 import type { Answers, Choice } from "./types.js";
+import { same } from "./util.js";
 
 /** `ungraded` means the answer key has no entry for that question. */
 export type Outcome = "correct" | "incorrect" | "blank" | "ungraded";
@@ -29,8 +30,12 @@ export interface ScoreOptions {
  * question the key does not cover comes back `ungraded` rather than counting
  * for or against the taker.
  *
+ * A multi-select answer (an array on either side) is correct only when it
+ * matches the key's set exactly — order and case aside, every required choice
+ * marked and nothing extra.
+ *
  * ```ts
- * score({ 1: "C", 2: "A" }, { 1: "C", 2: "B" }); // 1 correct, 1 incorrect
+ * score({ 1: "C", 2: ["A", "C"] }, { 1: "C", 2: ["A", "C"] }); // 2 correct
  * ```
  */
 export function score(answers: Answers, key: Answers, options: ScoreOptions = {}): Score {
@@ -47,9 +52,11 @@ export function score(answers: Answers, key: Answers, options: ScoreOptions = {}
     const expected = key[q];
     const given = answers[q];
     let outcome: Outcome;
-    if (expected === undefined) outcome = "ungraded";
-    else if (given === undefined) outcome = "blank";
-    else outcome = same(given, expected) ? "correct" : "incorrect";
+    // An empty array is as unanswered as a missing key: selected() returns
+    // [] for a blank question, and that must not grade as incorrect.
+    if (isEmpty(expected)) outcome = "ungraded";
+    else if (isEmpty(given)) outcome = "blank";
+    else outcome = sameAnswer(given!, expected!) ? "correct" : "incorrect";
 
     byQuestion[q] = outcome;
     if (outcome === "correct") correct++;
@@ -78,13 +85,17 @@ export interface SerializeOptions {
   questions?: number;
   /** Placeholder for an unanswered question. Default `"-"`. */
   blank?: string;
-  /** Put this between slots. Default `""`, which requires single-character labels. */
+  /**
+   * Put this between slots. Default `""`, which requires every slot to pack
+   * into a single character — one-character values, one selection each.
+   */
   separator?: string;
 }
 
 /**
  * Flatten answers into one compact string — handy for a URL, a database
- * column, or a diff.
+ * column, or a diff. A multi-select answer packs its selections side by side
+ * within the slot (`["A", "C"]` becomes `"AC"`), so it needs a `separator`.
  *
  * ```ts
  * serialize({ 1: "C", 3: "A" }, { questions: 4 }); // "C-A-"
@@ -99,10 +110,17 @@ export function serialize(answers: Answers, options: SerializeOptions = {}): str
 
   const cells: string[] = [];
   for (let q = 1; q <= questions; q++) {
-    const cell = answers[q] ?? blank;
+    const raw = answers[q];
+    if (Array.isArray(raw) && raw.some((part) => String(part).length !== 1)) {
+      // "10"+"11" would pack to "1011", which deserialize cannot split.
+      throw new Error(
+        `Cannot pack multi-select values longer than one character: ${JSON.stringify(raw)}`,
+      );
+    }
+    const cell = raw === undefined ? blank : Array.isArray(raw) ? raw.join("") : String(raw);
     if (separator === "" && cell.length !== 1) {
       throw new Error(
-        `Cannot pack ${JSON.stringify(cell)} without a separator: labels must be one character`,
+        `Cannot pack ${JSON.stringify(cell)} without a separator: each slot must be one character`,
       );
     }
     cells.push(cell);
@@ -111,12 +129,17 @@ export function serialize(answers: Answers, options: SerializeOptions = {}): str
 }
 
 export interface DeserializeOptions {
-  /** Restrict to these labels; anything else is treated as blank. */
+  /** Restrict to these values; anything else is treated as blank. */
   choices?: readonly Choice[];
   /** Placeholder for an unanswered question. Default `"-"`. */
   blank?: string;
   /** Separator used when the string was written. Default `""`. */
   separator?: string;
+  /**
+   * Read a multi-character slot as several one-character selections
+   * (`"AC"` becomes `["A", "C"]`) instead of one value. Default `false`.
+   */
+  multi?: boolean;
 }
 
 /** Read back a string written by {@link serialize}. */
@@ -129,14 +152,37 @@ export function deserialize(text: string, options: DeserializeOptions = {}): Ans
   cells.forEach((cell, i) => {
     const value = cell.trim();
     if (value === "" || value === blank) return;
-    const match = options.choices
-      ? options.choices.find((c) => same(c, value))
-      : value;
+
+    if (options.multi) {
+      const parts = Array.from(value)
+        .map((char) => matchChoice(char, options.choices))
+        .filter((c): c is Choice => c !== undefined);
+      if (parts.length > 0) answers[i + 1] = parts;
+      return;
+    }
+
+    const match = matchChoice(value, options.choices);
     if (match !== undefined) answers[i + 1] = match;
   });
   return answers;
 }
 
-function same(a: string, b: string): boolean {
-  return String(a).toLowerCase() === String(b).toLowerCase();
+function matchChoice(value: string, choices?: readonly Choice[]): Choice | undefined {
+  if (!choices) return value;
+  return choices.find((c) => same(c, value));
+}
+
+function isEmpty(value: Choice | readonly Choice[] | undefined): boolean {
+  return value === undefined || (Array.isArray(value) && value.length === 0);
+}
+
+function sameAnswer(
+  a: Choice | readonly Choice[],
+  b: Choice | readonly Choice[],
+): boolean {
+  const setA = (Array.isArray(a) ? a : [a as Choice]).map((c) => String(c).toLowerCase());
+  const setB = (Array.isArray(b) ? b : [b as Choice]).map((c) => String(c).toLowerCase());
+  if (setA.length !== setB.length) return false;
+  const sortedB = [...setB].sort();
+  return [...setA].sort().every((c, i) => c === sortedB[i]);
 }

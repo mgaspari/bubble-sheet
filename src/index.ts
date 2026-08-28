@@ -8,13 +8,15 @@ export type {
   Answers,
   ChangeEvent,
   Choice,
+  ChoiceSpec,
   Cursor,
   KeyInput,
+  ResizeEvent,
   SheetEvent,
   SheetOptions,
 } from "./types.js";
 export type { MountOptions, MountedSheet } from "./dom.js";
-export type { CharsetName, GridFieldOptions, MountedGridField } from "./grid.js";
+export type { CharsetName, GridFieldOptions, MaskSlot, MountedGridField } from "./grid.js";
 export type {
   DeserializeOptions,
   Outcome,

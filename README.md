@@ -3,6 +3,14 @@
 A scantron for the web: the answer sheet, the pencil-fill keyboard flow, and the
 grading — without a framework.
 
+The one idea: **every question is a group of cells, and every cell selects from
+a fixed menu of choices.** An exam question is one cell with five choices; a
+name field is twelve cells over the alphabet; a rating scale is one cell over
+the numbers; a date is digit cells with printed slashes. If it can be drawn as
+boxes and bubbles on paper, it is a configuration of the same model — and if it
+cannot (calendars, dropdowns, scrolling text), it belongs to some other
+library.
+
 The package is two layers. `Sheet` is the whole behaviour with no DOM at all:
 answers, a keyboard cursor, and the key handling that ties them together.
 `mount()` is a small renderer that draws that model into real, accessible radio
@@ -81,6 +89,8 @@ one column — the axes swap because the questions run sideways here
 | --- | --- | --- |
 | `cells` | `12` | character boxes in the field |
 | `charset` | `"letters"` | `"letters"`, `"digits"`, `"alphanumeric"`, or your own string/array |
+| `mask` | — | shape the field per position; see below |
+| `grow` | `false` | `true` or `{ min, max }`: the field grows as it is typed into |
 | `caption` | — | visible label, also the accessible name |
 | `text` | — | initial text, one character per cell |
 | `name` | — | `name` for a hidden input carrying the text, for plain form posts |
@@ -92,6 +102,43 @@ out), `value` for the raw cell-to-character map, `sheet`, `element`, `disabled`,
 `focus(cell)` and `destroy()`. Under the hood it is the same `Sheet`: cells are
 questions, characters are choices, so a twelve-box name field is a twelve
 question sheet with twenty-six choices each.
+
+### Masks
+
+A mask shapes the field position by position — digit cells with printed
+slashes is a date:
+
+```js
+const date = mountGrid("#date", { mask: "99/99/9999", caption: "Date" });
+date.text = "08282026";  // typed digits only…
+date.text;               // "08/28/2026" — literals come back on the way out
+```
+
+In a string mask `9` is a digit cell, `A` a letter cell, `*` alphanumeric, and
+any other character a printed literal — drawn on the form, never typed, never
+a cell. Each cell's bubble stack offers only its own characters, and a cell
+refuses characters that belong elsewhere. For finer control pass an array,
+where each entry is a string of characters for that cell or `{ literal }`:
+
+```js
+mountGrid("#time", { mask: ["012", "0123456789", { literal: ":" }, "012345", "0123456789"] });
+```
+
+### Growing fields
+
+A fixed field is the scantron default — the paper has exactly twelve boxes,
+and a blank column is meaningful. When length is genuinely unknown, let the
+field grow:
+
+```js
+mountGrid("#name", { charset: "letters", grow: { min: 1, max: 30 } });
+```
+
+The invariant: there is always exactly one empty cell after the last filled
+one, within `min..max`. Type into the last cell and a new one appears; erase
+and it falls away. Backspace clears the current column in place; on an empty
+column it clears the one to the left — so at the end of the field each press
+erases exactly one character, and the field shrinks as it goes.
 
 ## Keyboard
 
@@ -141,7 +188,8 @@ the reference doubles as a cheap "did anything change" check in a render loop.
 | Option | Default | |
 | --- | --- | --- |
 | `questions` | `50` | how many rows |
-| `choices` | `["A","B","C","D","E"]` | oval labels |
+| `choices` | `["A","B","C","D","E"]` | values, or `{ value, label }` pairs |
+| `maxSelections` | `1` | above 1, questions hold arrays ("mark all that apply") |
 | `value` | `{}` | initial answers |
 | `disabled` | `false` | refuse every mutation |
 | `wrap` | `false` | wrap at the ends instead of clamping |
@@ -151,11 +199,23 @@ the reference doubles as a cheap "did anything change" check in a render loop.
 | `digitTimeout` | `800` | ms that digits keep composing one number |
 | `now` | `Date.now` | clock for that timeout — inject one in tests |
 
-Answers are keyed by 1-based question number: `{ 1: "C", 2: "A" }`.
+Answers are keyed by 1-based question number: `{ 1: "C", 2: "A" }` — or, on a
+multi-select sheet, `{ 1: ["A", "C"] }`, kept in canonical choice order.
 
-**State** — `value` (get/set), `get(q)`, `set(q, choice)`, `clear(q)`,
-`toggle(q, choice)`, `clearAll()`, `setValue(next)`, `answered`, `complete`,
-`disabled`, `indexOf(choice)`.
+A choice can carry a label for display: `{ value: "5", label: "Great" }`. The
+value is what is stored and graded; `labelOf(choice)` returns the label, and
+the renderers draw it beside the bubble.
+
+**State** — `value` (get/set), `get(q)`, `selected(q)` (always an array),
+`has(q, choice)`, `set(q, choice)`, `unset(q, choice)`, `clear(q)`,
+`toggle(q, choice)`, `clearAll()`, `setValue(next)`, `resize(n)`, `answered`,
+`complete`, `disabled`, `multi`, `indexOf(choice)`, `labelOf(choice)`.
+
+On a multi-select sheet `set` adds a selection (refusing past
+`maxSelections`), `unset` removes one, and a choice key on the keyboard
+toggles without advancing. `resize(n)` changes the question count, dropping
+answers past the end; it emits a `resize` event, which is what lets a growing
+field add and remove cells.
 
 Mutators return `true` when something actually changed. `set` throws for a
 question off the sheet or a label that is not a choice — those are bugs, not
@@ -171,8 +231,8 @@ under one configuration still restores under another.
 that key, which is exactly when a DOM caller should `preventDefault()`. Keys
 held with a modifier are always left to the browser.
 
-**Events** — `on("change", fn)` and `on("cursor", fn)` return an unsubscribe
-function; `off()` drops everything. A change event carries `{ value, previous,
+**Events** — `on("change", fn)`, `on("cursor", fn)` and `on("resize", fn)`
+return an unsubscribe function; `off()` drops everything. A change event carries `{ value, previous,
 questions }`, where `questions` lists only what moved — enough to repaint a few
 rows instead of the sheet.
 
@@ -198,7 +258,9 @@ and `destroy()`. Every method on `sheet` is reflected in the markup, and the DOM
 is repainted from the model after each interaction, so a refused change can
 never leave the two out of step.
 
-Each question is a `radiogroup` of real `<input type="radio">` elements, which
+Each question is a `radiogroup` of real `<input type="radio">` elements — or
+checkboxes, on a multi-select sheet, so the browser's own toggling matches the
+model — which
 is what buys screen-reader support and native form submission for free — set
 `name` and a plain `<form>` post carries the answers with no JavaScript at all:
 
@@ -224,8 +286,12 @@ deserialize("C-A-"); // { 1: "C", 3: "A" }
 
 Comparison is case-insensitive throughout. A question the key does not cover
 comes back `ungraded` rather than counting for or against the taker, and
-`percent` divides by `graded`, not `total`. Multi-character labels need an
-explicit `separator`; single characters pack with none.
+`percent` divides by `graded`, not `total`. A multi-select answer is correct
+only as an exact set — every required choice marked and nothing extra. In
+`serialize`, a multi-select answer packs its selections side by side within
+the slot (`["A","C"]` becomes `"AC"`), which — like any multi-character slot —
+needs an explicit `separator`; `deserialize` reads them back with
+`{ multi: true }`.
 
 `columnize(questions, columns)` is the same layout helper `mount` uses, exported
 for anyone drawing their own grid.
@@ -247,8 +313,9 @@ overriding rules:
 ```
 
 The answer grid is `.bs-grid > .bs-col > .bs-row > .bs-timing | .bs-num |
-.bs-ovals > .bs-oval > input + .bs-face`; a field is `.bs-field >
-.bs-field-caption | .bs-cells > .bs-cell > .bs-box | .bs-stack > .bs-oval`. Both
+.bs-ovals > .bs-oval > input + .bs-face` (plus `.bs-choice-label` after a
+labeled bubble); a field is `.bs-field > .bs-field-caption | .bs-cells >
+.bs-cell > .bs-box | .bs-stack > .bs-oval`, with `.bs-sep` for mask literals. Both
 carry `.is-marked` on an answered row or cell, `.is-filled` on a filled oval and
 `.is-disabled` when disabled, and both read the same custom properties. Rows
 carry `data-question` and cells `data-cell`; inputs carry `data-choice`. Skip
@@ -269,8 +336,6 @@ npm run typecheck
 - `@bubble-sheet/react` — a `useSheet` hook and a `<BubbleSheet />` wrapping this
   same model.
 - Server rendering: emit the markup as a string so a sheet works before hydration.
-- Multi-select questions ("mark all that apply") and per-question choice counts.
-- A date grid-in, and a test-form letter block.
 - Print stylesheet, so a sheet on paper matches the sheet on screen.
 
 ## License

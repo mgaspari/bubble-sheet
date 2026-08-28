@@ -173,7 +173,6 @@
    ------------------------------------------------------------------------ */
 
 .bs-field {
-  --bs-cells: 12;
   --bs-oval-width: 17px;
   --bs-oval-height: 12px;
   --bs-oval-gap: 2px;
@@ -190,13 +189,26 @@
 }
 
 .bs-cells {
-  display: grid;
-  grid-template-columns: repeat(var(--bs-cells), minmax(0, 1fr));
+  display: flex;
   gap: var(--bs-cell-gap);
+}
+
+/* A printed literal in a mask (the slash in a date). Not a cell. */
+.bs-sep {
+  flex: none;
+  align-self: flex-start;
+  display: grid;
+  place-items: center;
+  height: calc(var(--bs-oval-width) + 4px);
+  font-family: ui-monospace, Menlo, Consolas, "Courier New", monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--bs-muted);
 }
 
 .bs-cell {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
   align-items: center;
   gap: 5px;
@@ -251,4 +263,19 @@
     --bs-oval-height: 11px;
   }
   .bs-box { font-size: 11px; }
+}
+
+/* A choice's longer label, beside its bubble on a labeled question. */
+.bs-choice-label {
+  align-self: center;
+  margin-left: 2px;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  color: var(--bs-ink);
+  white-space: nowrap;
+}
+
+.bs-oval:has(.bs-choice-label) {
+  display: flex;
+  gap: 3px;
 }

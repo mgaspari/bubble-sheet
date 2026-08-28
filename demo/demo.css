@@ -237,3 +237,27 @@ body {
   background: rgb(0 0 0 / 35%);
   color: #fff;
 }
+
+.survey {
+  display: grid;
+  gap: 10px;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--rule);
+}
+.survey-q {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+.survey-caption {
+  flex: 1 1 220px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #5c6650;
+}
+.survey-q .bs-row { padding-left: 0; }
+.survey-q .bs-row:nth-child(5n) { border-bottom: 0; }
+.survey-q .bs-num, .survey-q .bs-timing { display: none; }

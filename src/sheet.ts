@@ -2,8 +2,10 @@ import type {
   Answers,
   ChangeEvent,
   Choice,
+  ChoiceSpec,
   Cursor,
   KeyInput,
+  ResizeEvent,
   SheetEvent,
   SheetOptions,
 } from "./types.js";
@@ -24,14 +26,16 @@ type Listener = (event: any) => void;
  * ```
  */
 export class Sheet {
-  readonly questions: number;
   readonly choices: readonly Choice[];
+  readonly maxSelections: number;
   readonly wrap: boolean;
   readonly orientation: "rows" | "columns";
   readonly digitJump: boolean;
   readonly pageSize: number;
   readonly digitTimeout: number;
 
+  #questions: number;
+  #labels: ReadonlyMap<Choice, string>;
   #answers: Answers;
   #cursor: Cursor;
   #disabled: boolean;
@@ -42,11 +46,24 @@ export class Sheet {
   readonly #digitChoices: boolean;
 
   constructor(options: SheetOptions = {}) {
-    const choices = options.choices ?? DEFAULT_CHOICES;
-    if (choices.length === 0) throw new Error("Sheet needs at least one choice");
+    const specs = options.choices ?? DEFAULT_CHOICES;
+    if (specs.length === 0) throw new Error("Sheet needs at least one choice");
 
-    this.questions = Math.max(1, Math.floor(options.questions ?? 50));
-    this.choices = Object.freeze(choices.map(String));
+    const labels = new Map<Choice, string>();
+    this.choices = Object.freeze(
+      specs.map((spec) => {
+        if (typeof spec === "object") {
+          const value = String(spec.value);
+          if (spec.label !== undefined) labels.set(value, spec.label);
+          return value;
+        }
+        return String(spec);
+      }),
+    );
+    this.#labels = labels;
+
+    this.#questions = Math.max(1, Math.floor(options.questions ?? 50));
+    this.maxSelections = Math.max(1, Math.floor(options.maxSelections ?? 1));
     this.wrap = options.wrap ?? false;
     this.orientation = options.orientation ?? "rows";
     this.digitJump = options.digitJump ?? true;
@@ -56,15 +73,26 @@ export class Sheet {
     this.#digitChoices = this.choices.some((c) => /^[0-9]$/.test(c));
     this.#disabled = options.disabled ?? false;
     this.#now = options.now ?? Date.now;
-    this.#answers = freeze(sanitize(options.value ?? {}, this.questions, this.choices));
+    this.#answers = freeze(this.#sanitize(options.value ?? {}));
     this.#cursor = { question: 1, choice: 0 };
   }
 
   /* ---------------------------------------------------------------- state */
 
+  /** How many questions the sheet currently has. Changed via {@link resize}. */
+  get questions(): number {
+    return this.#questions;
+  }
+
+  /** True when one question may hold several choices. */
+  get multi(): boolean {
+    return this.maxSelections > 1;
+  }
+
   /**
    * The current answers. Frozen, and replaced rather than mutated on every
-   * change, so the reference is safe to use as a render key.
+   * change, so the reference is safe to use as a render key. Values are
+   * strings on a single-select sheet, arrays on a multi-select one.
    */
   get value(): Answers {
     return this.#answers;
@@ -82,40 +110,84 @@ export class Sheet {
     this.#disabled = next;
   }
 
-  /** How many questions carry an answer. */
+  /** How many questions carry at least one selection. */
   get answered(): number {
     return Object.keys(this.#answers).length;
   }
 
   get complete(): boolean {
-    return this.answered === this.questions;
+    return this.answered === this.#questions;
   }
 
-  /** The answer to `question`, or `undefined`. */
-  get(question: number): Choice | undefined {
+  /** The raw answer to `question` — a value, an array, or `undefined`. */
+  get(question: number): Choice | readonly Choice[] | undefined {
     return this.#answers[question];
+  }
+
+  /** The selections on `question` as an array, empty when blank. */
+  selected(question: number): readonly Choice[] {
+    const raw = this.#answers[question];
+    if (raw === undefined) return [];
+    return Array.isArray(raw) ? raw : [raw as Choice];
+  }
+
+  /** True when `question` holds `choice`. */
+  has(question: number, choice: Choice): boolean {
+    const index = this.indexOf(choice);
+    return index > -1 && this.selected(question).includes(this.choices[index]);
+  }
+
+  /** The display label for `choice`, when one was given. */
+  labelOf(choice: Choice): string | undefined {
+    return this.#labels.get(choice);
   }
 
   /**
    * Replace every answer at once. Entries outside the sheet — unknown
-   * questions, labels not in `choices` — are dropped rather than stored, so a
-   * sheet saved under a different configuration still restores cleanly.
+   * questions, values not in `choices`, selections past `maxSelections` — are
+   * dropped rather than stored, so a sheet saved under a different
+   * configuration still restores cleanly.
    */
   setValue(next: Answers): boolean {
     if (this.#disabled) return false;
-    return this.#commit(sanitize(next, this.questions, this.choices));
+    return this.#commit(this.#sanitize(next));
   }
 
-  /** Mark `question` with `choice`. Throws if either is off the sheet. */
+  /**
+   * Mark `question` with `choice`. On a single-select sheet this replaces the
+   * answer; on a multi-select sheet it adds a selection, refusing once
+   * `maxSelections` is reached. Throws if the question or choice is off the
+   * sheet.
+   */
   set(question: number, choice: Choice): boolean {
     const q = this.#assertQuestion(question);
-    const index = this.indexOf(choice);
-    if (index < 0) throw new Error(`Unknown choice: ${JSON.stringify(choice)}`);
-    if (this.#disabled || this.#answers[q] === this.choices[index]) return false;
-    return this.#commit({ ...this.#answers, [q]: this.choices[index] });
+    const value = this.#assertChoice(choice);
+    if (this.#disabled) return false;
+
+    if (!this.multi) {
+      if (this.#answers[q] === value) return false;
+      return this.#commit({ ...this.#answers, [q]: value });
+    }
+
+    const current = this.selected(q);
+    if (current.includes(value) || current.length >= this.maxSelections) return false;
+    const next = this.choices.filter((c) => c === value || current.includes(c));
+    return this.#commit({ ...this.#answers, [q]: next });
   }
 
-  /** Erase `question`. */
+  /** Remove one selection from `question`. On a single-select sheet, clears it. */
+  unset(question: number, choice: Choice): boolean {
+    const q = this.#assertQuestion(question);
+    const value = this.#assertChoice(choice);
+    if (this.#disabled) return false;
+
+    const current = this.selected(q);
+    if (!current.includes(value)) return false;
+    if (!this.multi || current.length === 1) return this.clear(q);
+    return this.#commit({ ...this.#answers, [q]: current.filter((c) => c !== value) });
+  }
+
+  /** Erase `question` entirely. */
   clear(question: number): boolean {
     const q = this.#assertQuestion(question);
     if (this.#disabled || !(q in this.#answers)) return false;
@@ -124,12 +196,11 @@ export class Sheet {
     return this.#commit(next);
   }
 
-  /** Mark `question`, or erase it if that choice is already filled. */
+  /** Mark `question` with `choice`, or remove that choice if already marked. */
   toggle(question: number, choice: Choice): boolean {
-    const q = this.#assertQuestion(question);
-    const index = this.indexOf(choice);
-    if (index < 0) throw new Error(`Unknown choice: ${JSON.stringify(choice)}`);
-    return this.#answers[q] === this.choices[index] ? this.clear(q) : this.set(q, this.choices[index]);
+    return this.has(question, choice)
+      ? this.unset(question, choice)
+      : this.set(question, choice);
   }
 
   /** Erase the whole sheet. */
@@ -144,6 +215,34 @@ export class Sheet {
     return this.choices.findIndex((c) => c.toLowerCase() === needle);
   }
 
+  /**
+   * Change the question count. Answers past the new end are dropped, and the
+   * cursor is clamped. Emits `resize` (and `change` if answers were dropped).
+   */
+  resize(questions: number): boolean {
+    const next = Math.max(1, Math.floor(questions));
+    if (this.#disabled || next === this.#questions) return false;
+
+    const previous = this.#questions;
+    this.#questions = next;
+
+    const kept: Answers = {};
+    let dropped = false;
+    for (const [key, value] of Object.entries(this.#answers)) {
+      if (Number(key) <= next) kept[Number(key)] = value;
+      else dropped = true;
+    }
+    if (dropped) this.#commit(kept);
+
+    if (this.#cursor.question > this.#questions) {
+      this.setCursor(this.#questions, this.#cursor.choice);
+    }
+    // Report the count as it stands now: a change listener above may itself
+    // have resized, and a stale number here would desync any renderer.
+    this.#emit("resize", { questions: this.#questions, previous } satisfies ResizeEvent);
+    return true;
+  }
+
   /* --------------------------------------------------------------- cursor */
 
   get cursor(): Cursor {
@@ -153,7 +252,7 @@ export class Sheet {
   /** Move the cursor. Out-of-range values clamp (or wrap, per `wrap`). */
   setCursor(question: number, choice = this.#cursor.choice): Cursor {
     const next = {
-      question: bound(Math.floor(question), 1, this.questions, this.wrap),
+      question: bound(Math.floor(question), 1, this.#questions, this.wrap),
       choice: bound(Math.floor(choice), 0, this.choices.length - 1, this.wrap),
     };
     if (next.question !== this.#cursor.question || next.choice !== this.#cursor.choice) {
@@ -181,16 +280,15 @@ export class Sheet {
    *
    * | Key | Effect |
    * | --- | --- |
-   * | a choice label | fill the question and advance |
+   * | a choice value | single-select: fill and advance. Multi: toggle, stay |
    * | `Backspace` | erase and step back |
    * | `Delete` | erase and stay |
-   * | `↑` `↓` | previous / next question |
-   * | `←` `→` | previous / next oval |
+   * | arrows | move; which pair walks questions follows `orientation` |
    * | `Home` `End` | first / last question |
    * | `PageUp` `PageDown` | move by `pageSize` |
-   * | `Enter` | fill the oval under the cursor and advance |
+   * | `Enter` | single-select: fill the cursor's oval and advance. Multi: advance |
    * | `Space` | toggle the oval under the cursor |
-   * | digits | jump to that question number |
+   * | digits | jump to that question number (when `digitJump`) |
    * | `Escape` | drop a half-typed question number |
    */
   handleKey(event: KeyInput): boolean {
@@ -202,8 +300,13 @@ export class Sheet {
     const isDigit = /^[0-9]$/.test(key);
     if (index > -1 && (!isDigit || this.#digitChoices)) {
       this.#digits = "";
-      this.set(question, this.choices[index]);
-      this.setCursor(question + 1, index);
+      if (this.multi) {
+        this.toggle(question, this.choices[index]);
+        this.setCursor(question, index);
+      } else {
+        this.set(question, this.choices[index]);
+        this.setCursor(question + 1, index);
+      }
       return true;
     }
 
@@ -239,10 +342,10 @@ export class Sheet {
         this.setCursor(1, choice);
         return true;
       case "End":
-        this.setCursor(this.questions, choice);
+        this.setCursor(this.#questions, choice);
         return true;
       case "Enter":
-        this.set(question, this.choices[choice]);
+        if (!this.multi) this.set(question, this.choices[choice]);
         this.setCursor(question + 1, choice);
         return true;
       case " ":
@@ -261,7 +364,7 @@ export class Sheet {
       const at = this.#now();
       if (at - this.#digitsAt > this.digitTimeout) this.#digits = "";
       this.#digitsAt = at;
-      this.#digits = (this.#digits + key).slice(-String(this.questions).length);
+      this.#digits = (this.#digits + key).slice(-String(this.#questions).length);
       const target = parseInt(this.#digits, 10);
       if (target >= 1) this.setCursor(target, 0);
       return true;
@@ -270,21 +373,12 @@ export class Sheet {
     return false;
   }
 
-  /**
-   * Route an arrow key. Whichever axis the questions run along moves between
-   * questions; the other moves between choices.
-   */
-  #arrow(axis: "vertical" | "horizontal", delta: number): void {
-    const questionAxis = this.orientation === "rows" ? "vertical" : "horizontal";
-    if (axis === questionAxis) this.moveQuestion(delta);
-    else this.moveChoice(delta);
-  }
-
   /* --------------------------------------------------------------- events */
 
-  /** Subscribe to `change` or `cursor`. Returns an unsubscribe function. */
+  /** Subscribe to `change`, `cursor` or `resize`. Returns an unsubscribe function. */
   on(event: "change", listener: (event: ChangeEvent) => void): () => void;
   on(event: "cursor", listener: (cursor: Cursor) => void): () => void;
+  on(event: "resize", listener: (event: ResizeEvent) => void): () => void;
   on(event: SheetEvent, listener: Listener): () => void {
     let set = this.#listeners.get(event);
     if (!set) this.#listeners.set(event, (set = new Set()));
@@ -301,6 +395,16 @@ export class Sheet {
 
   /* -------------------------------------------------------------- private */
 
+  /**
+   * Route an arrow key. Whichever axis the questions run along moves between
+   * questions; the other moves between choices.
+   */
+  #arrow(axis: "vertical" | "horizontal", delta: number): void {
+    const questionAxis = this.orientation === "rows" ? "vertical" : "horizontal";
+    if (axis === questionAxis) this.moveQuestion(delta);
+    else this.moveChoice(delta);
+  }
+
   #commit(next: Answers): boolean {
     const previous = this.#answers;
     const questions = changedQuestions(previous, next);
@@ -316,33 +420,71 @@ export class Sheet {
 
   #assertQuestion(question: number): number {
     const q = Math.floor(question);
-    if (!(q >= 1 && q <= this.questions)) {
-      throw new RangeError(`Question ${question} is outside 1..${this.questions}`);
+    if (!(q >= 1 && q <= this.#questions)) {
+      throw new RangeError(`Question ${question} is outside 1..${this.#questions}`);
     }
     return q;
+  }
+
+  #assertChoice(choice: Choice): Choice {
+    const index = this.indexOf(choice);
+    if (index < 0) throw new Error(`Unknown choice: ${JSON.stringify(choice)}`);
+    return this.choices[index];
+  }
+
+  /**
+   * Coerce arbitrary stored answers into this sheet's shape: known questions,
+   * known values, arrays capped and canonically ordered on a multi-select
+   * sheet, first-match-wins on a single-select one.
+   */
+  #sanitize(value: Answers): Answers {
+    const out: Answers = {};
+    for (const [key, raw] of Object.entries(value)) {
+      const q = Number(key);
+      if (!Number.isInteger(q) || q < 1 || q > this.#questions) continue;
+
+      const given = Array.isArray(raw) ? raw : [raw as Choice];
+      const matched: Choice[] = [];
+      for (const item of given) {
+        const index = this.indexOf(String(item));
+        if (index > -1 && !matched.includes(this.choices[index])) {
+          matched.push(this.choices[index]);
+        }
+      }
+      if (matched.length === 0) continue;
+
+      if (this.multi) {
+        const ordered = this.choices.filter((c) => matched.includes(c));
+        out[q] = ordered.slice(0, this.maxSelections);
+      } else {
+        out[q] = matched[0];
+      }
+    }
+    return out;
   }
 }
 
 function freeze(answers: Answers): Answers {
+  for (const value of Object.values(answers)) {
+    if (Array.isArray(value)) Object.freeze(value);
+  }
   return Object.freeze(answers);
 }
 
-function sanitize(value: Answers, questions: number, choices: readonly Choice[]): Answers {
-  const out: Answers = {};
-  for (const [key, choice] of Object.entries(value)) {
-    const q = Number(key);
-    if (!Number.isInteger(q) || q < 1 || q > questions) continue;
-    const match = choices.find((c) => c.toLowerCase() === String(choice).toLowerCase());
-    if (match !== undefined) out[q] = match;
-  }
-  return out;
+/** One comparable string per answer, so arrays and values compare uniformly. */
+function normalize(value: Choice | readonly Choice[] | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  // NUL cannot appear in a choice value typed or clicked in, so the join can
+  // never collide with a value that happens to contain the separator.
+  return Array.isArray(value) ? `\u0000${value.join("\u0000")}` : (value as string);
 }
 
 function changedQuestions(a: Answers, b: Answers): number[] {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   const changed: number[] = [];
   for (const key of keys) {
-    if (a[key as unknown as number] !== b[key as unknown as number]) changed.push(Number(key));
+    const q = Number(key);
+    if (normalize(a[q]) !== normalize(b[q])) changed.push(q);
   }
   return changed.sort((x, y) => x - y);
 }

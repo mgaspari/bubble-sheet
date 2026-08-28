@@ -19,10 +19,7 @@
         <div class="fields">
           <div id="name-field"></div>
           <div id="id-field"></div>
-          <div class="field">
-            <label for="f-date">Date</label>
-            <input id="f-date" placeholder="MM / DD / YY" />
-          </div>
+          <div id="date-field"></div>
         </div>
 
         <div class="instructions">
@@ -37,6 +34,17 @@
         </div>
 
         <div class="hold" id="hold"></div>
+
+        <div class="survey">
+          <div class="survey-q">
+            <span class="survey-caption">Section II - How was the exam?</span>
+            <div id="scale-q"></div>
+          </div>
+          <div class="survey-q">
+            <span class="survey-caption">Which sections did you attempt? Mark all that apply.</span>
+            <div id="multi-q"></div>
+          </div>
+        </div>
       </div>
 
       <div class="deck">
@@ -109,6 +117,41 @@
         name: "student-id",
       });
 
+      // A mask: digit cells with printed slashes, one bubble stack per digit.
+      const dateField = mountGrid("#date-field", {
+        mask: "99/99/9999",
+        caption: "Date",
+        name: "test-date",
+      });
+
+      // Labeled choices: the bubble carries the value, the label sits beside.
+      const scale = mount("#scale-q", {
+        questions: 1,
+        columns: 1,
+        choices: [
+          { value: "1", label: "Awful" },
+          { value: "2" },
+          { value: "3" },
+          { value: "4" },
+          { value: "5", label: "Great" },
+        ],
+        label: () => "How was the exam?",
+      });
+
+      // Multi-select renders checkboxes; keys toggle instead of advancing.
+      const sections = mount("#multi-q", {
+        questions: 1,
+        columns: 1,
+        maxSelections: Infinity,
+        choices: [
+          { value: "A", label: "Reading" },
+          { value: "B", label: "Writing" },
+          { value: "C", label: "Math" },
+          { value: "D", label: "Science" },
+        ],
+        label: () => "Sections attempted",
+      });
+
       const bubbles = mount(hold, {
         questions: QUESTIONS,
         columns: 2,
@@ -125,6 +168,9 @@
         bubbles.sheet.clearAll();
         nameField.sheet.clearAll();
         idField.sheet.clearAll();
+        dateField.sheet.clearAll();
+        scale.sheet.clearAll();
+        sections.sheet.clearAll();
         readout.innerHTML = '<span class="empty">Sheet erased.</span>';
       });
 
@@ -137,6 +183,9 @@
         bubbles.disabled = true;
         nameField.disabled = true;
         idField.disabled = true;
+        dateField.disabled = true;
+        scale.disabled = true;
+        sections.disabled = true;
         button.disabled = true;
         button.textContent = "Reading";
 
@@ -145,6 +194,9 @@
           bubbles.disabled = false;
           nameField.disabled = false;
           idField.disabled = false;
+          dateField.disabled = false;
+          scale.disabled = false;
+          sections.disabled = false;
           button.disabled = false;
           button.textContent = "Read sheet";
           report();
@@ -170,7 +222,10 @@
 
         readout.innerHTML = `
           <div><span class="k">name</span> ${nameField.text || "—"}
-            <span class="k">id</span> ${idField.text || "—"}</div>
+            <span class="k">id</span> ${idField.text || "—"}
+            <span class="k">date</span> ${dateField.text || "—"}</div>
+          <div><span class="k">rating</span> ${scale.sheet.selected(1).join("") || "—"}
+            <span class="k">sections</span> ${sections.sheet.selected(1).join("") || "—"}</div>
           ${marks}
           <div><span class="k">packed</span> ${serialize(answers, { questions: QUESTIONS })}</div>
           <div><span class="k">score</span> ${result.correct}/${result.graded}
