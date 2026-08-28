@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>bubble-sheet — demo</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="../dist/bubble-sheet.css" />
+    <link rel="stylesheet" href="./demo.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="form">
+        <div class="band">
+          <h1>Answer Sheet</h1>
+          <span class="serial">FORM 882-E / 50Q / A-E</span>
+        </div>
+
+        <div class="fields">
+          <div class="field">
+            <label for="f-name">Name</label>
+            <input id="f-name" placeholder="LAST, FIRST" />
+          </div>
+          <div class="field">
+            <label for="f-id">Student ID</label>
+            <input id="f-id" placeholder="000000" />
+          </div>
+          <div class="field">
+            <label for="f-date">Date</label>
+            <input id="f-date" placeholder="MM / DD / YY" />
+          </div>
+        </div>
+
+        <div class="instructions">
+          <p>
+            <strong>Use no. 2 pencil only.</strong> Fill the oval completely.
+            Erase cleanly. Click a filled oval to erase it.
+          </p>
+          <div class="samples">
+            <div class="sample"><span class="chip good"></span><span>Correct</span></div>
+            <div class="sample"><span class="chip bad"></span><span>Incorrect</span></div>
+          </div>
+        </div>
+
+        <div class="hold" id="hold"></div>
+      </div>
+
+      <div class="deck">
+        <button class="btn" id="read">Read sheet</button>
+        <button class="btn ghost" id="erase">Erase all</button>
+        <span class="tally" id="tally"></span>
+      </div>
+
+      <div class="readout" id="readout">
+        <span class="empty">Mark some ovals, then read the sheet to see the output.</span>
+      </div>
+
+      <p class="foot">
+        Click an oval, then type A–E to fill and advance. Backspace erases.
+        Type a number to jump to that question.
+      </p>
+    </div>
+
+    <script type="module">
+      import { mount, score, serialize } from "../dist/esm/index.js";
+
+      const QUESTIONS = 50;
+
+      // A throwaway key so the demo has something to grade against.
+      const KEY = Object.fromEntries(
+        Array.from({ length: QUESTIONS }, (_, i) => [i + 1, "ABCDE"[(i * 7) % 5]]),
+      );
+
+      const hold = document.getElementById("hold");
+      const tally = document.getElementById("tally");
+      const readout = document.getElementById("readout");
+
+      const bubbles = mount(hold, {
+        questions: QUESTIONS,
+        columns: 2,
+        value: { 1: "C", 2: "A", 3: "E", 4: "B" },
+        onChange: showTally,
+      });
+
+      function showTally() {
+        tally.textContent = `${bubbles.sheet.answered} / ${QUESTIONS} marked`;
+      }
+      showTally();
+
+      document.getElementById("erase").addEventListener("click", () => {
+        bubbles.sheet.clearAll();
+        readout.innerHTML = '<span class="empty">Sheet erased.</span>';
+      });
+
+      document.getElementById("read").addEventListener("click", (event) => {
+        const button = event.currentTarget;
+        const head = document.createElement("div");
+        head.className = "readhead";
+        hold.appendChild(head);
+
+        bubbles.disabled = true;
+        button.disabled = true;
+        button.textContent = "Reading";
+
+        setTimeout(() => {
+          head.remove();
+          bubbles.disabled = false;
+          button.disabled = false;
+          button.textContent = "Read sheet";
+          report();
+        }, 1300);
+      });
+
+      function report() {
+        const answers = bubbles.value;
+        if (bubbles.sheet.answered === 0) {
+          readout.innerHTML = '<span class="empty">Sheet is blank. No marks detected.</span>';
+          return;
+        }
+
+        const result = score(answers, KEY);
+        const marks = Object.keys(answers)
+          .map(Number)
+          .sort((a, b) => a - b)
+          .map((q) => {
+            const state = result.byQuestion[q] === "correct" ? "ok" : "no";
+            return `<span class="k">${q}:</span><span class="${state}">${answers[q]}</span> `;
+          })
+          .join("");
+
+        readout.innerHTML = `
+          ${marks}
+          <div><span class="k">packed</span> ${serialize(answers, { questions: QUESTIONS })}</div>
+          <div><span class="k">score</span> ${result.correct}/${result.graded}
+            (${Math.round(result.percent * 100)}%) — ${result.blank} blank</div>
+        `;
+      }
+    </script>
+  </body>
+</html>

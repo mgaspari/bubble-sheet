@@ -1,0 +1,165 @@
+/*
+ * bubble-sheet — component styles.
+ *
+ * Only the grid itself lives here; the paper, the header fields and the rest
+ * of the form are yours. Retheme through the custom properties below rather
+ * than by overriding rules.
+ */
+
+.bs-grid {
+  --bs-columns: 2;
+  --bs-ink: #1b1d16;
+  --bs-muted: #6b7560;
+  --bs-rule: #a3af95;
+  --bs-accent: #b4322a;
+  --bs-oval-width: 26px;
+  --bs-oval-height: 16px;
+  --bs-oval-gap: 4px;
+  --bs-row-gap: 7px;
+  --bs-column-gap: 10px;
+  --bs-graphite: repeating-linear-gradient(112deg, #4c4c55 0 2px, #3c3c46 2px 4px);
+
+  display: grid;
+  grid-template-columns: repeat(var(--bs-columns), minmax(0, 1fr));
+  gap: 0 var(--bs-column-gap);
+  color: var(--bs-ink);
+}
+
+.bs-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.bs-row {
+  display: flex;
+  align-items: center;
+  gap: var(--bs-row-gap);
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+/* A dotted rule every fifth row, the way printed forms group them. */
+.bs-row:nth-child(5n) {
+  border-bottom: 1px dotted var(--bs-rule);
+  padding-bottom: 3px;
+}
+
+.bs-row:hover {
+  background: rgb(0 0 0 / 4.5%);
+}
+
+.bs-row:focus-within {
+  background: color-mix(in srgb, var(--bs-accent) 10%, transparent);
+}
+
+/* The black registration mark a real reader tracks rows by. */
+.bs-timing {
+  flex: none;
+  width: 9px;
+  height: 5px;
+  background: var(--bs-ink);
+}
+
+.bs-num {
+  flex: none;
+  width: 20px;
+  text-align: right;
+  font-family: ui-monospace, Menlo, Consolas, "Courier New", monospace;
+  font-size: 10.5px;
+  color: var(--bs-muted);
+}
+
+.bs-row.is-marked .bs-num {
+  color: var(--bs-ink);
+  font-weight: 700;
+}
+
+.bs-ovals {
+  display: flex;
+  gap: var(--bs-oval-gap);
+}
+
+.bs-oval {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+
+.bs-oval input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: inherit;
+}
+
+.bs-face {
+  display: grid;
+  place-items: center;
+  width: var(--bs-oval-width);
+  height: var(--bs-oval-height);
+  border: 1.5px solid var(--bs-ink);
+  border-radius: 999px;
+  font: 700 9px/1 inherit;
+  letter-spacing: 0.04em;
+  color: var(--bs-muted);
+  transition: background-color 0.1s, color 0.1s, transform 0.08s;
+}
+
+.bs-oval:hover .bs-face {
+  background: rgb(0 0 0 / 7%);
+}
+
+.bs-oval input:focus-visible + .bs-face {
+  outline: 2px solid var(--bs-accent);
+  outline-offset: 2px;
+}
+
+.bs-oval.is-filled .bs-face {
+  border-color: #24242b;
+  color: rgb(255 255 255 / 45%);
+  background:
+    radial-gradient(ellipse at 32% 28%, rgb(255 255 255 / 20%), transparent 62%),
+    var(--bs-graphite);
+  animation: bs-fill-in 0.16s ease-out;
+}
+
+.bs-grid.is-disabled {
+  opacity: 0.55;
+}
+
+.bs-grid.is-disabled .bs-oval {
+  cursor: not-allowed;
+}
+
+@keyframes bs-fill-in {
+  from {
+    transform: scale(0.86);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bs-face {
+    transition: none;
+  }
+  .bs-oval.is-filled .bs-face {
+    animation: none;
+  }
+}
+
+/* Ovals need to clear a finger on a phone; one column reads better there. */
+@media (max-width: 620px) {
+  .bs-grid {
+    grid-template-columns: 1fr;
+    --bs-oval-width: 30px;
+    --bs-oval-height: 20px;
+  }
+  .bs-row {
+    padding: 3px 6px;
+  }
+}
