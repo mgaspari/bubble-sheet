@@ -339,6 +339,7 @@ npm run typecheck
 The first publish is manual — the npm name is claimed by whoever runs it:
 
 ```bash
+npm install        # dev dependencies — the publish step builds and tests
 npm login          # once, with your npmjs.com account
 npm publish        # runs the full build + 82 tests first, then uploads
 ```
