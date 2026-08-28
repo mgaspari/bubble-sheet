@@ -11,6 +11,8 @@ name: Publish
 on:
   release:
     types: [published]
+  push:
+    tags: ["v*"]
 
 permissions:
   contents: read

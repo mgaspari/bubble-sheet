@@ -357,9 +357,10 @@ npm publish        # runs the full build + 82 tests first, then uploads
 
 After that, releases go through CI: on npmjs.com, add a Trusted Publisher
 (package settings, GitHub Actions, repository `mgaspari/bubble-sheet`,
-workflow `publish.yml`) — then publishing a GitHub release runs the tests
-and publishes with provenance, no tokens stored anywhere. Bump `version`
-in package.json before tagging.
+workflow `publish.yml`) — then pushing a version tag (`git tag v0.1.2 &&
+git push origin v0.1.2`) or publishing a GitHub release runs the tests and
+publishes with provenance, no tokens stored anywhere. Bump `version` in
+package.json before tagging.
 
 ## Roadmap
 
