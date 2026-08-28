@@ -63,6 +63,7 @@
       // Classic script, so it runs even when the module below cannot load.
       function bootError(message) {
         var el = document.getElementById("boot");
+        if (!el.hidden) return; // the first diagnosis is the specific one
         el.innerHTML = message;
         el.hidden = false;
       }

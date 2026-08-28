@@ -138,7 +138,6 @@ export function mountGrid(
     const box = doc.createElement("input");
     box.className = `${prefix}-box`;
     box.type = "text";
-    box.maxLength = 1;
     box.autocomplete = "off";
     box.spellcheck = false;
     box.setAttribute("autocapitalize", "characters");
@@ -318,6 +317,9 @@ export function mountGrid(
     const el = event.target as HTMLElement;
     const cell = Number((el as HTMLInputElement).dataset?.cell);
     if (!cell) return;
+    // Select what is already in the box, so the next keystroke overwrites it
+    // rather than being refused for want of room.
+    if (el.classList.contains(`${prefix}-box`)) (el as HTMLInputElement).select();
     const choice = (el as HTMLInputElement).dataset?.choice;
     sheet.setCursor(cell, choice === undefined ? sheet.cursor.choice : Number(choice));
   }
