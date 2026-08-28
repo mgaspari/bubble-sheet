@@ -3,6 +3,12 @@
 A scantron for the web: the answer sheet, the pencil-fill keyboard flow, and the
 grading — without a framework.
 
+**[Live demo](https://mgaspari.github.io/bubble-sheet/)** — everything below,
+on one form.
+
+![Filling out the demo sheet: grid-in name, ID and date fields, then answers
+typed with the keyboard](https://raw.githubusercontent.com/mgaspari/bubble-sheet/main/media/demo.gif)
+
 The one idea: **every question is a group of cells, and every cell selects from
 a fixed menu of choices.** An exam question is one cell with five choices; a
 name field is twelve cells over the alphabet; a rating scale is one cell over
