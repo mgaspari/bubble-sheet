@@ -17,14 +17,8 @@
         </div>
 
         <div class="fields">
-          <div class="field">
-            <label for="f-name">Name</label>
-            <input id="f-name" placeholder="LAST, FIRST" />
-          </div>
-          <div class="field">
-            <label for="f-id">Student ID</label>
-            <input id="f-id" placeholder="000000" />
-          </div>
+          <div id="name-field"></div>
+          <div id="id-field"></div>
           <div class="field">
             <label for="f-date">Date</label>
             <input id="f-date" placeholder="MM / DD / YY" />
@@ -56,13 +50,37 @@
       </div>
 
       <p class="foot">
-        Click an oval, then type A–E to fill and advance. Backspace erases.
-        Type a number to jump to that question.
+        Print your name and ID at the top — typing a character fills its bubble
+        and moves to the next box. In the answer grid, click an oval then type
+        A–E to fill and advance; Backspace erases; a number jumps to that
+        question.
       </p>
     </div>
 
+    <div class="boot" id="boot" hidden></div>
+
+    <script>
+      // Classic script, so it runs even when the module below cannot load.
+      function bootError(message) {
+        var el = document.getElementById("boot");
+        el.innerHTML = message;
+        el.hidden = false;
+      }
+      if (location.protocol === "file:") {
+        bootError(
+          "This page loads ES modules, which browsers block on <code>file://</code>.<br />" +
+            "Serve it instead: <code>npm install &amp;&amp; npm start</code>",
+        );
+      }
+    </script>
+
     <script type="module">
-      import { mount, score, serialize } from "../dist/esm/index.js";
+      const lib = await import("../dist/esm/index.js").catch(() => null);
+      if (!lib) {
+        bootError("The build is missing. Run <code>npm install &amp;&amp; npm start</code>.");
+        throw new Error("dist/ not built");
+      }
+      const { mount, mountGrid, score, serialize } = lib;
 
       const QUESTIONS = 50;
 
@@ -74,6 +92,21 @@
       const hold = document.getElementById("hold");
       const tally = document.getElementById("tally");
       const readout = document.getElementById("readout");
+
+      const nameField = mountGrid("#name-field", {
+        cells: 12,
+        charset: "letters",
+        caption: "Name (last, first)",
+        name: "student-name",
+        text: "GASPARI",
+      });
+
+      const idField = mountGrid("#id-field", {
+        cells: 8,
+        charset: "digits",
+        caption: "Student ID",
+        name: "student-id",
+      });
 
       const bubbles = mount(hold, {
         questions: QUESTIONS,
@@ -89,6 +122,8 @@
 
       document.getElementById("erase").addEventListener("click", () => {
         bubbles.sheet.clearAll();
+        nameField.sheet.clearAll();
+        idField.sheet.clearAll();
         readout.innerHTML = '<span class="empty">Sheet erased.</span>';
       });
 
@@ -99,12 +134,16 @@
         hold.appendChild(head);
 
         bubbles.disabled = true;
+        nameField.disabled = true;
+        idField.disabled = true;
         button.disabled = true;
         button.textContent = "Reading";
 
         setTimeout(() => {
           head.remove();
           bubbles.disabled = false;
+          nameField.disabled = false;
+          idField.disabled = false;
           button.disabled = false;
           button.textContent = "Read sheet";
           report();
@@ -129,6 +168,8 @@
           .join("");
 
         readout.innerHTML = `
+          <div><span class="k">name</span> ${nameField.text || "—"}
+            <span class="k">id</span> ${idField.text || "—"}</div>
           ${marks}
           <div><span class="k">packed</span> ${serialize(answers, { questions: QUESTIONS })}</div>
           <div><span class="k">score</span> ${result.correct}/${result.graded}

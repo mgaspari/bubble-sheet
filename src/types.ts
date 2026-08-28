@@ -23,6 +23,19 @@ export interface SheetOptions {
   disabled?: boolean;
   /** Wrap around at the ends instead of clamping when navigating. Default `false`. */
   wrap?: boolean;
+  /**
+   * Which way the questions run, which is what the arrow keys follow.
+   * `"rows"` (default) is an answer sheet: up/down walk questions, left/right
+   * walk the ovals. `"columns"` is a grid-in field: left/right walk the
+   * character cells, up/down walk the letters stacked inside one.
+   */
+  orientation?: "rows" | "columns";
+  /**
+   * Let digit keys jump to a question number. Default `true`. Turn it off for
+   * fields where a digit is a value rather than an address. Ignored when the
+   * choices themselves are digits — those always fill.
+   */
+  digitJump?: boolean;
   /** Questions moved per PageUp/PageDown. Default `10`. */
   pageSize?: number;
   /**

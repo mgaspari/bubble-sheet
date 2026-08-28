@@ -41,16 +41,17 @@
     "./package.json": "./package.json"
   },
   "scripts": {
+    "start": "node scripts/serve.mjs",
+    "demo": "node scripts/serve.mjs",
+    "build": "npm run clean && npm run build:esm && npm run build:cjs && npm run build:css",
     "clean": "rm -rf dist",
     "build:esm": "tsc -p tsconfig.build.json",
     "build:cjs": "tsc -p tsconfig.cjs.json && node scripts/finish-cjs.mjs",
     "build:css": "mkdir -p dist && cp src/bubble-sheet.css dist/bubble-sheet.css",
-    "build": "npm run clean && npm run build:esm && npm run build:cjs && npm run build:css",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run build && node --test test/*.test.js",
-    "prepublishOnly": "npm test",
     "test:fast": "node --test test/*.test.js",
-    "demo": "npm run build && node scripts/serve.mjs"
+    "prepublishOnly": "npm test"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

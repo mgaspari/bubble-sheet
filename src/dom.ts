@@ -189,8 +189,13 @@ export function mount(target: Element | string, options: MountOptions = {}): Mou
     // should not undo the mark that was just made.
     if ((event as MouseEvent).detail > 0 && sheet.get(q) === input.value) {
       sheet.clear(q);
+      paintRow(q);
+      return;
     }
-    paintRow(q);
+    // Filling is left to the change event that follows: repainting here would
+    // undo the browser's own check before that event is delivered. The one
+    // exception is a sheet that refuses the mark outright.
+    if (sheet.disabled) paintRow(q);
   }
 
   grid.addEventListener("keydown", onKeyDown);

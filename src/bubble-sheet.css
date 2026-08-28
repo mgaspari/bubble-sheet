@@ -6,8 +6,8 @@
  * than by overriding rules.
  */
 
-.bs-grid {
-  --bs-columns: 2;
+.bs-grid,
+.bs-field {
   --bs-ink: #1b1d16;
   --bs-muted: #6b7560;
   --bs-rule: #a3af95;
@@ -18,11 +18,14 @@
   --bs-row-gap: 7px;
   --bs-column-gap: 10px;
   --bs-graphite: repeating-linear-gradient(112deg, #4c4c55 0 2px, #3c3c46 2px 4px);
+  color: var(--bs-ink);
+}
 
+.bs-grid {
+  --bs-columns: 2;
   display: grid;
   grid-template-columns: repeat(var(--bs-columns), minmax(0, 1fr));
   gap: 0 var(--bs-column-gap);
-  color: var(--bs-ink);
 }
 
 .bs-col {
@@ -162,4 +165,90 @@
   .bs-row {
     padding: 3px 6px;
   }
+}
+
+/* ------------------------------------------------------------------------
+   Grid-in fields — the name and ID blocks, where a character is printed in a
+   box and then bubbled in the column beneath it.
+   ------------------------------------------------------------------------ */
+
+.bs-field {
+  --bs-cells: 12;
+  --bs-oval-width: 17px;
+  --bs-oval-height: 12px;
+  --bs-oval-gap: 2px;
+  --bs-cell-gap: 3px;
+}
+
+.bs-field-caption {
+  margin-bottom: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--bs-muted);
+}
+
+.bs-cells {
+  display: grid;
+  grid-template-columns: repeat(var(--bs-cells), minmax(0, 1fr));
+  gap: var(--bs-cell-gap);
+}
+
+.bs-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* The box you print the character into. */
+.bs-box {
+  width: 100%;
+  max-width: calc(var(--bs-oval-width) + 4px);
+  aspect-ratio: 1;
+  padding: 0;
+  background: transparent;
+  border: 1.5px solid var(--bs-ink);
+  border-radius: 1px;
+  font-family: ui-monospace, Menlo, Consolas, "Courier New", monospace;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  color: var(--bs-ink);
+}
+
+.bs-box:focus-visible {
+  outline: 2px solid var(--bs-accent);
+  outline-offset: 2px;
+}
+
+.bs-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--bs-oval-gap);
+  align-items: center;
+}
+
+.bs-stack .bs-face {
+  font-size: 8px;
+}
+
+.bs-field.is-disabled {
+  opacity: 0.55;
+}
+
+.bs-field.is-disabled .bs-oval {
+  cursor: not-allowed;
+}
+
+@media (max-width: 620px) {
+  .bs-field {
+    --bs-oval-width: 15px;
+    --bs-oval-height: 11px;
+  }
+  .bs-box { font-size: 11px; }
 }

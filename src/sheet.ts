@@ -27,6 +27,8 @@ export class Sheet {
   readonly questions: number;
   readonly choices: readonly Choice[];
   readonly wrap: boolean;
+  readonly orientation: "rows" | "columns";
+  readonly digitJump: boolean;
   readonly pageSize: number;
   readonly digitTimeout: number;
 
@@ -46,6 +48,8 @@ export class Sheet {
     this.questions = Math.max(1, Math.floor(options.questions ?? 50));
     this.choices = Object.freeze(choices.map(String));
     this.wrap = options.wrap ?? false;
+    this.orientation = options.orientation ?? "rows";
+    this.digitJump = options.digitJump ?? true;
     this.pageSize = Math.max(1, Math.floor(options.pageSize ?? 10));
     this.digitTimeout = options.digitTimeout ?? 800;
 
@@ -214,16 +218,16 @@ export class Sheet {
         this.clear(question);
         return true;
       case "ArrowDown":
-        this.moveQuestion(1);
+        this.#arrow("vertical", 1);
         return true;
       case "ArrowUp":
-        this.moveQuestion(-1);
+        this.#arrow("vertical", -1);
         return true;
       case "ArrowRight":
-        this.moveChoice(1);
+        this.#arrow("horizontal", 1);
         return true;
       case "ArrowLeft":
-        this.moveChoice(-1);
+        this.#arrow("horizontal", -1);
         return true;
       case "PageDown":
         this.moveQuestion(this.pageSize);
@@ -253,6 +257,7 @@ export class Sheet {
     }
 
     if (isDigit) {
+      if (!this.digitJump) return false;
       const at = this.#now();
       if (at - this.#digitsAt > this.digitTimeout) this.#digits = "";
       this.#digitsAt = at;
@@ -263,6 +268,16 @@ export class Sheet {
     }
 
     return false;
+  }
+
+  /**
+   * Route an arrow key. Whichever axis the questions run along moves between
+   * questions; the other moves between choices.
+   */
+  #arrow(axis: "vertical" | "horizontal", delta: number): void {
+    const questionAxis = this.orientation === "rows" ? "vertical" : "horizontal";
+    if (axis === questionAxis) this.moveQuestion(delta);
+    else this.moveChoice(delta);
   }
 
   /* --------------------------------------------------------------- events */

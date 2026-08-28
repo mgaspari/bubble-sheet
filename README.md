@@ -9,6 +9,22 @@ answers, a keyboard cursor, and the key handling that ties them together.
 inputs and keeps the two in sync. A React wrapper — when it lands — is a hook
 over the same `Sheet`, not a second implementation.
 
+## Run it
+
+```bash
+npm install
+npm start        # → http://localhost:5173
+```
+
+That serves `demo/`: a full form — name and ID grid-ins, fifty questions, a
+reader head that sweeps the page. `npm start` builds first if `dist/` is
+missing or stale, so a fresh clone works from those two commands alone.
+
+Opening `demo/index.html` straight off the filesystem will *not* work, because
+browsers block ES modules over `file://`. The page says so if you try.
+
+## Install
+
 ```bash
 npm install bubble-sheet
 ```
@@ -34,10 +50,48 @@ document.querySelector("#grade").addEventListener("click", () => {
 });
 ```
 
-`npm run demo` serves a full form — paper, header fields, a reader head that
-sweeps the page — at <http://localhost:5173>. The source of that page is in
-[`demo/`](demo/), and everything outside the grid is deliberately not in the
-package.
+Everything outside the grid — the paper, the printed instructions, the reader
+head — lives in [`demo/`](demo/) and is deliberately not in the package.
+
+## Name and ID fields
+
+The other half of a scantron is the block at the top where you print your name
+one character per box and fill the matching bubble in the column beneath. That
+is `mountGrid`:
+
+```js
+import { mountGrid } from "bubble-sheet";
+
+const name = mountGrid("#name", { cells: 12, charset: "letters", caption: "Name" });
+const id = mountGrid("#id", { cells: 8, charset: "digits", caption: "Student ID" });
+
+name.text = "GASPARI";     // paints the boxes and the bubbles
+id.text;                   // "40218837"
+```
+
+Typing in a box fills that column's bubble and moves to the next box; filling a
+bubble writes the character back into the box. `Space` blanks a column, which is
+how a last name is split from a first. `Backspace` clears the current cell, or
+steps back and clears the previous one when it is already empty. `←` `→` walk
+the cells, and on the bubbles themselves `↑` `↓` walk the characters stacked in
+one column — the axes swap because the questions run sideways here
+(`orientation: "columns"`).
+
+| Option | Default | |
+| --- | --- | --- |
+| `cells` | `12` | character boxes in the field |
+| `charset` | `"letters"` | `"letters"`, `"digits"`, `"alphanumeric"`, or your own string/array |
+| `caption` | — | visible label, also the accessible name |
+| `text` | — | initial text, one character per cell |
+| `name` | — | `name` for a hidden input carrying the text, for plain form posts |
+| `onChange` | — | called with the field's text |
+| `prefix`, `sheet`, `disabled`, `wrap` | | as for `mount` |
+
+The handle exposes `text` (get and set — trailing blanks trimmed on the way
+out), `value` for the raw cell-to-character map, `sheet`, `element`, `disabled`,
+`focus(cell)` and `destroy()`. Under the hood it is the same `Sheet`: cells are
+questions, characters are choices, so a twelve-box name field is a twelve
+question sheet with twenty-six choices each.
 
 ## Keyboard
 
@@ -91,6 +145,8 @@ the reference doubles as a cheap "did anything change" check in a render loop.
 | `value` | `{}` | initial answers |
 | `disabled` | `false` | refuse every mutation |
 | `wrap` | `false` | wrap at the ends instead of clamping |
+| `orientation` | `"rows"` | `"rows"`: `↑`/`↓` walk questions. `"columns"`: `←`/`→` do |
+| `digitJump` | `true` | let digit keys jump to a question number |
 | `pageSize` | `10` | questions per `PageUp` / `PageDown` |
 | `digitTimeout` | `800` | ms that digits keep composing one number |
 | `now` | `Date.now` | clock for that timeout — inject one in tests |
@@ -190,19 +246,22 @@ overriding rules:
 }
 ```
 
-The structure is `.bs-grid > .bs-col > .bs-row > .bs-timing | .bs-num |
-.bs-ovals > .bs-oval > input + .bs-face`, with `.is-marked` on an answered row,
-`.is-filled` on a filled oval and `.is-disabled` on a disabled grid. Rows carry
-`data-question`; inputs carry `data-question` and `data-choice`. Skip the
-stylesheet entirely and style those hooks yourself if you would rather.
+The answer grid is `.bs-grid > .bs-col > .bs-row > .bs-timing | .bs-num |
+.bs-ovals > .bs-oval > input + .bs-face`; a field is `.bs-field >
+.bs-field-caption | .bs-cells > .bs-cell > .bs-box | .bs-stack > .bs-oval`. Both
+carry `.is-marked` on an answered row or cell, `.is-filled` on a filled oval and
+`.is-disabled` when disabled, and both read the same custom properties. Rows
+carry `data-question` and cells `data-cell`; inputs carry `data-choice`. Skip
+the stylesheet entirely and style those hooks yourself if you would rather.
 
 ## Development
 
 ```bash
 npm install
-npm test        # builds, then runs the model and jsdom suites
-npm run demo    # build and serve demo/ on :5173
+npm start       # build if needed, then serve demo/ on :5173
+npm test        # build, then run the model and jsdom suites (50 tests)
 npm run build   # ESM + CJS + types + css into dist/
+npm run typecheck
 ```
 
 ## Roadmap
@@ -211,6 +270,7 @@ npm run build   # ESM + CJS + types + css into dist/
   same model.
 - Server rendering: emit the markup as a string so a sheet works before hydration.
 - Multi-select questions ("mark all that apply") and per-question choice counts.
+- A date grid-in, and a test-form letter block.
 - Print stylesheet, so a sheet on paper matches the sheet on screen.
 
 ## License
