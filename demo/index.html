@@ -44,6 +44,10 @@
             <span class="survey-caption">Which sections did you attempt? Mark all that apply.</span>
             <div id="multi-q"></div>
           </div>
+          <div class="survey-q">
+            <span class="survey-caption">One word for this exam. The field grows as you type.</span>
+            <div id="word-q"></div>
+          </div>
         </div>
       </div>
 
@@ -138,6 +142,15 @@
         label: () => "How was the exam?",
       });
 
+      // A growing field: always one empty cell after the last filled one,
+      // appearing as you type and falling away as you erase.
+      const word = mountGrid("#word-q", {
+        charset: "letters",
+        grow: { min: 1, max: 14 },
+        caption: "One word",
+        name: "one-word",
+      });
+
       // Multi-select renders checkboxes; keys toggle instead of advancing.
       const sections = mount("#multi-q", {
         questions: 1,
@@ -169,6 +182,7 @@
         nameField.sheet.clearAll();
         idField.sheet.clearAll();
         dateField.sheet.clearAll();
+        word.sheet.clearAll();
         scale.sheet.clearAll();
         sections.sheet.clearAll();
         readout.innerHTML = '<span class="empty">Sheet erased.</span>';
@@ -184,6 +198,7 @@
         nameField.disabled = true;
         idField.disabled = true;
         dateField.disabled = true;
+        word.disabled = true;
         scale.disabled = true;
         sections.disabled = true;
         button.disabled = true;
@@ -195,6 +210,7 @@
           nameField.disabled = false;
           idField.disabled = false;
           dateField.disabled = false;
+          word.disabled = false;
           scale.disabled = false;
           sections.disabled = false;
           button.disabled = false;
@@ -225,7 +241,8 @@
             <span class="k">id</span> ${idField.text || "—"}
             <span class="k">date</span> ${dateField.text || "—"}</div>
           <div><span class="k">rating</span> ${scale.sheet.selected(1).join("") || "—"}
-            <span class="k">sections</span> ${sections.sheet.selected(1).join("") || "—"}</div>
+            <span class="k">sections</span> ${sections.sheet.selected(1).join("") || "—"}
+            <span class="k">word</span> ${word.text || "—"}</div>
           ${marks}
           <div><span class="k">packed</span> ${serialize(answers, { questions: QUESTIONS })}</div>
           <div><span class="k">score</span> ${result.correct}/${result.graded}
