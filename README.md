@@ -145,10 +145,13 @@ mountGrid("#name", { charset: "letters", grow: { min: 1, max: 30 } });
 ```
 
 The invariant: there is always exactly one empty cell after the last filled
-one, within `min..max`. Type into the last cell and a new one appears; erase
-and it falls away. Backspace clears the current column in place; on an empty
-column it clears the one to the left — so at the end of the field each press
-erases exactly one character, and the field shrinks as it goes.
+one — or after the cursor, when a typed space has carried it further out — so
+`ADA LOVELACE` types straight through: the space grows a blank column and
+holds the field open for the next word, and an abandoned trailing blank
+collapses once the cursor leaves it. Backspace clears the current column in
+place; on an empty column it clears the one to the left — so at the end of the
+field each press erases exactly one character, and the field shrinks as it
+goes.
 
 ## Keyboard
 

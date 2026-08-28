@@ -130,6 +130,57 @@ test("setting shorter text shrinks the field back", () => {
   assert.equal(field.text, "LI");
 });
 
+test("a space holds a growing field open for the next word", () => {
+  const field = mountGrid(host, { grow: { max: 14 } });
+  field.focus(1);
+  for (const char of "ADA") type(dom.window.document.activeElement, char);
+  assert.equal(cellCount(field), 4);
+  press(dom.window.document.activeElement, " "); // grows a blank column
+  assert.equal(cellCount(field), 5);
+  for (const char of "LOVELACE") type(dom.window.document.activeElement, char);
+  assert.equal(field.text, "ADA LOVELACE");
+  assert.equal(cellCount(field), 13);
+});
+
+test("a held-open cell collapses when abandoned", () => {
+  const field = mountGrid(host, { grow: { max: 10 }, text: "ADA" });
+  field.focus(4);
+  press(boxOf(field, 4), " "); // held open: 5 cells, nothing in 4
+  assert.equal(cellCount(field), 5);
+  field.focus(1); // wander back inside, leaving the blank trailing
+  assert.equal(cellCount(field), 4);
+  assert.equal(field.text, "ADA");
+});
+
+test("focus leaving the field also releases a held-open cell", () => {
+  const outside = dom.window.document.createElement("input");
+  host.appendChild(outside);
+  const field = mountGrid(host, { grow: { max: 10 }, text: "ADA" });
+  field.focus(4);
+  press(boxOf(field, 4), " ");
+  assert.equal(cellCount(field), 5);
+  field.element.dispatchEvent(
+    new dom.window.FocusEvent("focusout", { bubbles: true, relatedTarget: outside }),
+  );
+  assert.equal(cellCount(field), 4);
+});
+
+test("space on a bubble also holds a growing field open", () => {
+  const field = mountGrid(host, { grow: { max: 8 }, text: "AB" });
+  const oval = field.element.querySelector('.bs-cell[data-cell="3"] input[value="C"]');
+  oval.focus();
+  press(oval, " ");
+  assert.equal(cellCount(field), 4);
+  assert.equal(field.sheet.cursor.question, 4);
+});
+
+test("space at max cannot grow past it", () => {
+  const field = mountGrid(host, { grow: { min: 2, max: 3 }, text: "AB" });
+  field.focus(3);
+  press(boxOf(field, 3), " ");
+  assert.equal(cellCount(field), 3);
+});
+
 test("cells added by growth are live, not stale clones", () => {
   const field = mountGrid(host, { grow: { max: 6 } });
   field.focus(1);

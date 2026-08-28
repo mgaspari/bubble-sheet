@@ -326,11 +326,31 @@ export function mountGrid(
   }
 
   /**
-   * Keep the growth invariant: one empty cell after the last filled one,
-   * within min..max. A no-op on fixed fields.
+   * Keep the growth invariant: one empty cell after the last filled one — or
+   * after the cursor, when a typed space has carried it further out. That is
+   * what lets "ADA LOVELACE" be typed: the space holds the field open while
+   * the next word arrives, and the held cell collapses once the cursor moves
+   * back leaving it trailing. Within min..max; a no-op on fixed fields.
    */
   function ensureSize(): void {
     if (!grow || resizing) return;
+    let lastFilled = 0;
+    for (const key of Object.keys(sheet.value)) lastFilled = Math.max(lastFilled, Number(key));
+    safeResize(clamp(Math.max(lastFilled + 1, sheet.cursor.question), grow.min, grow.max));
+  }
+
+  /**
+   * A space at the field's current end needs somewhere to advance to: grow by
+   * one cell before the cursor moves, since the cursor clamps to the cells
+   * that exist.
+   */
+  function holdOpenFor(cell: number): void {
+    if (grow && cell === sheet.questions && cell < grow.max) safeResize(cell + 1);
+  }
+
+  /** Drop a held-open trailing blank; content alone decides the size again. */
+  function releaseHold(): void {
+    if (!grow) return;
     let lastFilled = 0;
     for (const key of Object.keys(sheet.value)) lastFilled = Math.max(lastFilled, Number(key));
     safeResize(clamp(lastFilled + 1, grow.min, grow.max));
@@ -425,6 +445,7 @@ export function mountGrid(
   });
 
   const offCursor = sheet.on("cursor", (cursor) => {
+    ensureSize();
     if (field.contains(doc.activeElement)) focusCell(cursor.question, inBox());
   });
 
@@ -482,6 +503,8 @@ export function mountGrid(
         // A blank column, which is how a last name is split from a first.
         key.preventDefault();
         sheet.clear(cell);
+        holdOpenFor(cell);
+        sheet.setCursor(cell + 1);
         focusCell(cell + 1, true);
         return;
       case "ArrowLeft":
@@ -508,6 +531,7 @@ export function mountGrid(
     const key = event as KeyboardEvent;
     if (!(key.target as HTMLElement).closest?.(`.${prefix}-stack`)) return;
     const cell = Number((key.target as HTMLInputElement).dataset?.cell);
+    if ((key.key === " " || key.key === "Spacebar") && cell) holdOpenFor(cell);
     // A masked cell only accepts its own characters, even though the model's
     // menu is the union of every cell's.
     if (key.key.length === 1 && cell && !charsAt(cell).some((c) => same(c, key.key))) {
@@ -517,6 +541,13 @@ export function mountGrid(
       }
     }
     if (sheet.handleKey(key)) key.preventDefault();
+  }
+
+  function onFocusOut(event: Event): void {
+    // Focus left the field entirely: a blank held open by the cursor is
+    // abandoned, so let the size settle back to the content.
+    const next = (event as FocusEvent).relatedTarget as Node | null;
+    if (!next || !field.contains(next)) releaseHold();
   }
 
   function onFocusIn(event: Event): void {
@@ -558,6 +589,7 @@ export function mountGrid(
   field.addEventListener("keydown", onBoxKeyDown);
   field.addEventListener("keydown", onOvalKeyDown);
   field.addEventListener("focusin", onFocusIn);
+  field.addEventListener("focusout", onFocusOut);
   field.addEventListener("change", onChangeEvent);
   field.addEventListener("click", onClick);
 
@@ -597,6 +629,7 @@ export function mountGrid(
       field.removeEventListener("keydown", onBoxKeyDown);
       field.removeEventListener("keydown", onOvalKeyDown);
       field.removeEventListener("focusin", onFocusIn);
+      field.removeEventListener("focusout", onFocusOut);
       field.removeEventListener("change", onChangeEvent);
       field.removeEventListener("click", onClick);
       field.remove();
