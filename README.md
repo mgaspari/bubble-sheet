@@ -101,7 +101,7 @@ one column — the axes swap because the questions run sideways here
 | `charset` | `"letters"` | `"letters"`, `"digits"`, `"alphanumeric"`, or your own string/array |
 | `mask` | — | shape the field per position; see below |
 | `grow` | `false` | `true` or `{ min, max }`: the field grows as it is typed into |
-| `spaceBubble` | on for `grow` fields | a tappable space control atop each column; see below |
+| `spaceBubble` | on for `grow` fields | put a space on each column's menu; see below |
 | `caption` | — | visible label, also the accessible name |
 | `text` | — | initial text, one character per cell |
 | `name` | — | `name` for a hidden input carrying the text, for plain form posts |
@@ -146,20 +146,19 @@ mountGrid("#name", { charset: "letters", grow: { min: 1, max: 30 } });
 ```
 
 The invariant: there is always exactly one empty cell after the last filled
-one — or after the cursor, when a typed space has carried it further out — so
-`ADA LOVELACE` types straight through: the space grows a blank column and
-holds the field open for the next word, and an abandoned trailing blank
-collapses once the cursor leaves it. Backspace clears the current column in
-place; on an empty column it clears the one to the left — so at the end of the
-field each press erases exactly one character, and the field shrinks as it
-goes.
+one, within `min..max`. Type into the last cell and a new one appears; erase
+and it falls away. Backspace clears the current column in place; on an empty
+column it clears the one to the left — so at the end of the field each press
+erases exactly one character, and the field shrinks as it goes.
 
-Growing fields also render a dashed `␣` control at the top of each column —
-the pointer's Space key, for touch users who cannot otherwise grow the field
-past a word. It is a control, not a value: tapping it blanks the column and
-moves on, and nothing is stored. Force it on or off anywhere with
-`spaceBubble`; fixed fields default to off, since clicking a filled bubble
-already erases it and an untouched column already is a space.
+Growing fields also put a space on each column's menu (`spaceBubble`, on by
+default for them): a dashed `␣` bubble whose value really is `" "`. A space
+is a character like any other here — it stores, paints, erases with a click,
+survives save and restore, and the field grows past it, which is how
+`ADA LOVELACE` is typed by keyboard or by tapping alone. Fixed fields default
+to off — an untouched column already reads as a space, and their `text` comes
+back with those gaps as spaces either way — but `spaceBubble` forces it
+anywhere, masks included.
 
 ## Keyboard
 

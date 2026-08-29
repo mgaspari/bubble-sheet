@@ -46,11 +46,11 @@ export interface GridFieldOptions
    */
   grow?: boolean | { min?: number; max?: number };
   /**
-   * Put a tappable space control at the top of each column — the pointer
-   * equivalent of the Space key: blank this column and move on. A control,
-   * not a value: it stores nothing. Default: on for growing fields (where
-   * touch users otherwise cannot make the field grow past a word), off
-   * elsewhere, since clicking a filled bubble already erases it.
+   * Put a space on each column's menu: a real choice with value `" "`, drawn
+   * as a dashed bubble at the top of the stack. Marking it stores a space —
+   * so it paints, erases like any bubble, survives save and restore, and a
+   * growing field grows past it. Default: on for growing fields, off
+   * elsewhere, where an untouched column already reads as a space.
    */
   spaceBubble?: boolean;
   /** Visible caption, e.g. `"Name"`. Also names the field for screen readers. */
@@ -154,7 +154,7 @@ export function mountGrid(
   /** Per-cell character menus, 0-indexed by cell number - 1. */
   const cellChars = slots
     .filter((slot): slot is CellSlot => slot.kind === "cell")
-    .map((slot) => slot.chars);
+    .map((slot) => (spaceBubble ? [" ", ...slot.chars] : slot.chars));
   const maxCells = cellChars.length;
   if (maxCells === 0) throw new Error("A field needs at least one cell");
 
@@ -254,7 +254,10 @@ export function mountGrid(
     box.autocomplete = "off";
     box.spellcheck = false;
     box.setAttribute("autocapitalize", "characters");
-    box.setAttribute("inputmode", chars.every(isDigit) ? "numeric" : "text");
+    box.setAttribute(
+      "inputmode",
+      chars.every((c) => c === " " || isDigit(c)) ? "numeric" : "text",
+    );
     box.setAttribute("aria-label", `${caption || "Field"}, character ${cell}`);
     box.dataset.cell = String(cell);
     boxes.set(cell, box);
@@ -264,23 +267,11 @@ export function mountGrid(
     stack.setAttribute("role", "radiogroup");
     stack.setAttribute("aria-label", `${caption || "Field"}, character ${cell}`);
 
-    if (spaceBubble) {
-      const space = doc.createElement("button");
-      space.type = "button";
-      space.className = `${prefix}-oval ${prefix}-space`;
-      space.dataset.cell = String(cell);
-      space.setAttribute("aria-label", `Space: blank column ${cell} and move on`);
-      const face = doc.createElement("span");
-      face.className = `${prefix}-face`;
-      face.textContent = "\u2423";
-      space.appendChild(face);
-      stack.appendChild(space);
-    }
-
     for (const char of chars) {
       const i = sheet.indexOf(char);
       const label = doc.createElement("label");
-      label.className = `${prefix}-oval`;
+      label.className =
+        char === " " ? `${prefix}-oval ${prefix}-space` : `${prefix}-oval`;
 
       const input = doc.createElement("input");
       input.type = "radio";
@@ -288,10 +279,11 @@ export function mountGrid(
       input.value = char;
       input.dataset.cell = String(cell);
       input.dataset.choice = String(i);
+      if (char === " ") input.setAttribute("aria-label", `Space, column ${cell}`);
 
       const face = doc.createElement("span");
       face.className = `${prefix}-face`;
-      face.textContent = char;
+      face.textContent = char === " " ? "\u2423" : char;
 
       label.append(input, face);
       stack.appendChild(label);
@@ -330,9 +322,6 @@ export function mountGrid(
   function syncDisabled(): void {
     for (const box of boxes.values()) box.disabled = sheet.disabled;
     for (const { input } of ovals.values()) input.disabled = sheet.disabled;
-    for (const el of field.querySelectorAll<HTMLButtonElement>(`.${prefix}-space`)) {
-      el.disabled = sheet.disabled;
-    }
     field.classList.toggle("is-disabled", sheet.disabled);
     field.setAttribute("aria-disabled", String(sheet.disabled));
   }
@@ -351,39 +340,13 @@ export function mountGrid(
   }
 
   /**
-   * Keep the growth invariant: one empty cell after the last filled one — or
-   * after the cursor, when a typed space has carried it further out. That is
-   * what lets "ADA LOVELACE" be typed: the space holds the field open while
-   * the next word arrives, and the held cell collapses once the cursor moves
-   * back leaving it trailing. Within min..max; a no-op on fixed fields.
+   * Keep the growth invariant: one empty cell after the last filled one,
+   * within min..max. A stored space is content like any other character, so a
+   * field grows past it — which is how "ADA LOVELACE" is typed. A no-op on
+   * fixed fields.
    */
   function ensureSize(): void {
     if (!grow || resizing) return;
-    let lastFilled = 0;
-    for (const key of Object.keys(sheet.value)) lastFilled = Math.max(lastFilled, Number(key));
-    safeResize(clamp(Math.max(lastFilled + 1, sheet.cursor.question), grow.min, grow.max));
-  }
-
-  /**
-   * A space at the field's current end needs somewhere to advance to: grow by
-   * one cell before the cursor moves, since the cursor clamps to the cells
-   * that exist.
-   */
-  function holdOpenFor(cell: number): void {
-    if (grow && cell === sheet.questions && cell < grow.max) safeResize(cell + 1);
-  }
-
-  /** What the Space key does, callable from the tappable space control too. */
-  function spaceAt(cell: number): void {
-    sheet.clear(cell);
-    holdOpenFor(cell);
-    sheet.setCursor(cell + 1);
-    focusCell(cell + 1, false);
-  }
-
-  /** Drop a held-open trailing blank; content alone decides the size again. */
-  function releaseHold(): void {
-    if (!grow) return;
     let lastFilled = 0;
     for (const key of Object.keys(sheet.value)) lastFilled = Math.max(lastFilled, Number(key));
     safeResize(clamp(lastFilled + 1, grow.min, grow.max));
@@ -478,7 +441,6 @@ export function mountGrid(
   });
 
   const offCursor = sheet.on("cursor", (cursor) => {
-    ensureSize();
     if (field.contains(doc.activeElement)) focusCell(cursor.question, inBox());
   });
 
@@ -533,11 +495,12 @@ export function mountGrid(
         sheet.clear(cell);
         return;
       case " ":
-        // A blank column, which is how a last name is split from a first.
+        // With a space on the menu, the input event stores it like any typed
+        // character. Otherwise it blanks the column and moves on, which is
+        // how a last name is split from a first.
+        if (charsAt(cell).includes(" ")) return;
         key.preventDefault();
         sheet.clear(cell);
-        holdOpenFor(cell);
-        sheet.setCursor(cell + 1);
         focusCell(cell + 1, true);
         return;
       case "ArrowLeft":
@@ -565,16 +528,6 @@ export function mountGrid(
     const target = key.target as HTMLElement;
     if (!target.closest?.(`.${prefix}-stack`)) return;
     const cell = Number((target as HTMLInputElement).dataset?.cell);
-    // The space control activates on Enter too, and must fire exactly once —
-    // never both natively and through handleKey.
-    if (target.classList?.contains(`${prefix}-space`)) {
-      if (key.key === " " || key.key === "Spacebar" || key.key === "Enter") {
-        key.preventDefault();
-        if (cell) spaceAt(cell);
-        return;
-      }
-    }
-    if ((key.key === " " || key.key === "Spacebar") && cell) holdOpenFor(cell);
     // A masked cell only accepts its own characters, even though the model's
     // menu is the union of every cell's.
     if (key.key.length === 1 && cell && !charsAt(cell).some((c) => same(c, key.key))) {
@@ -584,13 +537,6 @@ export function mountGrid(
       }
     }
     if (sheet.handleKey(key)) key.preventDefault();
-  }
-
-  function onFocusOut(event: Event): void {
-    // Focus left the field entirely: a blank held open by the cursor is
-    // abandoned, so let the size settle back to the content.
-    const next = (event as FocusEvent).relatedTarget as Node | null;
-    if (!next || !field.contains(next)) releaseHold();
   }
 
   function onFocusIn(event: Event): void {
@@ -613,13 +559,6 @@ export function mountGrid(
   }
 
   function onClick(event: Event): void {
-    const space = (event.target as HTMLElement).closest?.(`.${prefix}-space`) as
-      | HTMLElement
-      | null;
-    if (space && (event as MouseEvent).detail > 0 && !sheet.disabled) {
-      spaceAt(Number(space.dataset.cell));
-      return;
-    }
     const input = (event.target as HTMLElement).closest?.("input[type=radio]") as
       | HTMLInputElement
       | null;
@@ -639,7 +578,6 @@ export function mountGrid(
   field.addEventListener("keydown", onBoxKeyDown);
   field.addEventListener("keydown", onOvalKeyDown);
   field.addEventListener("focusin", onFocusIn);
-  field.addEventListener("focusout", onFocusOut);
   field.addEventListener("change", onChangeEvent);
   field.addEventListener("click", onClick);
 
@@ -679,7 +617,6 @@ export function mountGrid(
       field.removeEventListener("keydown", onBoxKeyDown);
       field.removeEventListener("keydown", onOvalKeyDown);
       field.removeEventListener("focusin", onFocusIn);
-      field.removeEventListener("focusout", onFocusOut);
       field.removeEventListener("change", onChangeEvent);
       field.removeEventListener("click", onClick);
       field.remove();

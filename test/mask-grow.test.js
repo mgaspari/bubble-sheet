@@ -130,88 +130,72 @@ test("setting shorter text shrinks the field back", () => {
   assert.equal(field.text, "LI");
 });
 
-test("a space holds a growing field open for the next word", () => {
+test("a typed space is stored and the field grows past it", () => {
   const field = mountGrid(host, { grow: { max: 14 } });
   field.focus(1);
-  for (const char of "ADA") type(dom.window.document.activeElement, char);
-  assert.equal(cellCount(field), 4);
-  press(dom.window.document.activeElement, " "); // grows a blank column
+  for (const char of "ADA ") type(dom.window.document.activeElement, char);
+  assert.equal(field.value[4], " ");
   assert.equal(cellCount(field), 5);
   for (const char of "LOVELACE") type(dom.window.document.activeElement, char);
   assert.equal(field.text, "ADA LOVELACE");
   assert.equal(cellCount(field), 13);
 });
 
-test("a held-open cell collapses when abandoned", () => {
-  const field = mountGrid(host, { grow: { max: 10 }, text: "ADA" });
-  field.focus(4);
-  press(boxOf(field, 4), " "); // held open: 5 cells, nothing in 4
-  assert.equal(cellCount(field), 5);
-  field.focus(1); // wander back inside, leaving the blank trailing
-  assert.equal(cellCount(field), 4);
-  assert.equal(field.text, "ADA");
+test("a trailing stored space survives, an untouched cell does not", () => {
+  const field = mountGrid(host, { grow: { max: 10 } });
+  field.focus(1);
+  for (const char of "ADA ") type(dom.window.document.activeElement, char);
+  assert.equal(field.text, "ADA ");
+  // it round-trips through text and through value
+  const restored = mountGrid(host, { grow: { max: 10 }, text: "ADA " });
+  assert.equal(restored.text, "ADA ");
+  assert.equal(restored.value[4], " ");
 });
 
-test("focus leaving the field also releases a held-open cell", () => {
-  const outside = dom.window.document.createElement("input");
-  host.appendChild(outside);
-  const field = mountGrid(host, { grow: { max: 10 }, text: "ADA" });
-  field.focus(4);
-  press(boxOf(field, 4), " ");
-  assert.equal(cellCount(field), 5);
-  field.element.dispatchEvent(
-    new dom.window.FocusEvent("focusout", { bubbles: true, relatedTarget: outside }),
-  );
-  assert.equal(cellCount(field), 4);
-});
-
-test("space on a bubble also holds a growing field open", () => {
-  const field = mountGrid(host, { grow: { max: 8 }, text: "AB" });
-  const oval = field.element.querySelector('.bs-cell[data-cell="3"] input[value="C"]');
-  oval.focus();
-  press(oval, " ");
-  assert.equal(cellCount(field), 4);
-  assert.equal(field.sheet.cursor.question, 4);
-});
-
-test("space at max cannot grow past it", () => {
-  const field = mountGrid(host, { grow: { min: 2, max: 3 }, text: "AB" });
-  field.focus(3);
-  press(boxOf(field, 3), " ");
-  assert.equal(cellCount(field), 3);
-});
-
-test("growing fields render a space control; fixed fields do not", () => {
+test("growing fields put a space on the menu; fixed fields do not", () => {
   const grown = mountGrid(host, { grow: true });
-  assert.equal(grown.element.querySelectorAll(".bs-space").length, 1);
+  assert.equal(grown.element.querySelectorAll(".bs-space input").length, 1);
+  assert.equal(grown.element.querySelector(".bs-space input").value, " ");
   const fixed = mountGrid(host, { cells: 3 });
   assert.equal(fixed.element.querySelectorAll(".bs-space").length, 0);
   const forced = mountGrid(host, { cells: 2, spaceBubble: true });
   assert.equal(forced.element.querySelectorAll(".bs-space").length, 2);
 });
 
-test("tapping the space control blanks, advances, and holds open", () => {
+test("the space bubble marks, paints, erases, and grows like any choice", () => {
   const field = mountGrid(host, { grow: { max: 10 }, text: "ADA" });
-  assert.equal(cellCount(field), 4);
-  const space = field.element.querySelector('.bs-cell[data-cell="4"] .bs-space');
+  const space = field.element.querySelector('.bs-cell[data-cell="4"] .bs-space input');
+  space.checked = true;
+  space.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+  assert.equal(field.value[4], " ");
+  assert.equal(field.text, "ADA ");
+  assert.equal(cellCount(field), 5);
+  assert.equal(
+    field.element.querySelector('.bs-cell[data-cell="4"] .bs-space').classList.contains("is-filled"),
+    true,
+  );
+  // clicking the filled space erases it, like any bubble
   space.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, detail: 1 }));
-  assert.equal(cellCount(field), 5); // held open past the blank
-  assert.equal(field.sheet.cursor.question, 5);
-  // it stores nothing
-  assert.deepEqual(field.value, { 1: "A", 2: "D", 3: "A" });
-  // and on a filled column it erases, like the Space key
-  const erase = field.element.querySelector('.bs-cell[data-cell="2"] .bs-space');
-  erase.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, detail: 1 }));
-  assert.equal(field.text, "A A");
+  assert.equal(field.value[4], undefined);
+  assert.equal(field.text, "ADA");
 });
 
-test("the space control activates once on Enter, never twice", () => {
-  const field = mountGrid(host, { grow: { max: 6 }, text: "AB" });
-  const space = field.element.querySelector('.bs-cell[data-cell="3"] .bs-space');
-  space.focus();
-  press(space, "Enter");
+test("space on a bubble stores through the keyboard too", () => {
+  const field = mountGrid(host, { grow: { max: 8 }, text: "AB" });
+  const oval = field.element.querySelector('.bs-cell[data-cell="3"] input[value="C"]');
+  oval.focus();
+  press(oval, " ");
+  assert.equal(field.value[3], " ");
   assert.equal(cellCount(field), 4);
   assert.equal(field.sheet.cursor.question, 4);
+});
+
+test("a space at max fills the last cell without growing past it", () => {
+  const field = mountGrid(host, { grow: { min: 2, max: 3 }, text: "AB" });
+  field.focus(3);
+  type(boxOf(field, 3), " ");
+  assert.equal(cellCount(field), 3);
+  assert.equal(field.text, "AB ");
 });
 
 test("cells added by growth are live, not stale clones", () => {
