@@ -1,22 +1,29 @@
-# Publishes to npm when a GitHub release is published.
+# Publishes to npm via trusted publishing (OIDC) — no tokens stored anywhere.
 #
-# One-time setup (no tokens, no secrets): on npmjs.com, package settings ->
-# Trusted Publishing -> add GitHub Actions publisher with
-#   repository: mgaspari/bubble-sheet, workflow: publish.yml.
-# For the very first publish the package must exist, so run `npm publish`
-# once locally (see README) or create the trusted publisher on the
-# "first-time publish" flow npmjs.com offers.
+# One-time setup: on npmjs.com, package settings -> Trusted Publisher ->
+# GitHub Actions, repository mgaspari/bubble-sheet, workflow publish.yml,
+# allowed action Publish.
+#
+# A release happens whenever main carries a version npm does not have yet —
+# so releasing is: bump "version" in package.json, push to main. Tags and
+# GitHub releases also trigger it, and the guard makes every path a no-op
+# unless the version is actually new.
 name: Publish
 
 on:
+  push:
+    branches: [main]
+    tags: ["v*"]
   release:
     types: [published]
-  push:
-    tags: ["v*"]
 
 permissions:
   contents: read
   id-token: write # OIDC for npm trusted publishing + provenance
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -27,7 +34,20 @@ jobs:
         with:
           node-version: 24
           registry-url: https://registry.npmjs.org
+      - name: Is this version new?
+        id: check
+        run: |
+          PUBLISHED=$(npm view bubble-sheet version 2>/dev/null || echo "none")
+          CURRENT=$(node -p "require('./package.json').version")
+          echo "published=$PUBLISHED current=$CURRENT"
+          if [ "$PUBLISHED" = "$CURRENT" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Already on npm; nothing to publish."
+          fi
       # Trusted publishing needs npm 11.5+
-      - run: npm install -g npm@latest
-      - run: npm ci
-      - run: npm publish
+      - if: steps.check.outputs.skip != 'true'
+        run: npm install -g npm@latest
+      - if: steps.check.outputs.skip != 'true'
+        run: npm ci
+      - if: steps.check.outputs.skip != 'true'
+        run: npm publish
