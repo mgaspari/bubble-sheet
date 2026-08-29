@@ -181,6 +181,39 @@ test("space at max cannot grow past it", () => {
   assert.equal(cellCount(field), 3);
 });
 
+test("growing fields render a space control; fixed fields do not", () => {
+  const grown = mountGrid(host, { grow: true });
+  assert.equal(grown.element.querySelectorAll(".bs-space").length, 1);
+  const fixed = mountGrid(host, { cells: 3 });
+  assert.equal(fixed.element.querySelectorAll(".bs-space").length, 0);
+  const forced = mountGrid(host, { cells: 2, spaceBubble: true });
+  assert.equal(forced.element.querySelectorAll(".bs-space").length, 2);
+});
+
+test("tapping the space control blanks, advances, and holds open", () => {
+  const field = mountGrid(host, { grow: { max: 10 }, text: "ADA" });
+  assert.equal(cellCount(field), 4);
+  const space = field.element.querySelector('.bs-cell[data-cell="4"] .bs-space');
+  space.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, detail: 1 }));
+  assert.equal(cellCount(field), 5); // held open past the blank
+  assert.equal(field.sheet.cursor.question, 5);
+  // it stores nothing
+  assert.deepEqual(field.value, { 1: "A", 2: "D", 3: "A" });
+  // and on a filled column it erases, like the Space key
+  const erase = field.element.querySelector('.bs-cell[data-cell="2"] .bs-space');
+  erase.dispatchEvent(new dom.window.MouseEvent("click", { bubbles: true, detail: 1 }));
+  assert.equal(field.text, "A A");
+});
+
+test("the space control activates once on Enter, never twice", () => {
+  const field = mountGrid(host, { grow: { max: 6 }, text: "AB" });
+  const space = field.element.querySelector('.bs-cell[data-cell="3"] .bs-space');
+  space.focus();
+  press(space, "Enter");
+  assert.equal(cellCount(field), 4);
+  assert.equal(field.sheet.cursor.question, 4);
+});
+
 test("cells added by growth are live, not stale clones", () => {
   const field = mountGrid(host, { grow: { max: 6 } });
   field.focus(1);

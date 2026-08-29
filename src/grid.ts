@@ -45,6 +45,14 @@ export interface GridFieldOptions
    * `mask`.
    */
   grow?: boolean | { min?: number; max?: number };
+  /**
+   * Put a tappable space control at the top of each column — the pointer
+   * equivalent of the Space key: blank this column and move on. A control,
+   * not a value: it stores nothing. Default: on for growing fields (where
+   * touch users otherwise cannot make the field grow past a word), off
+   * elsewhere, since clicking a filled bubble already erases it.
+   */
+  spaceBubble?: boolean;
   /** Visible caption, e.g. `"Name"`. Also names the field for screen readers. */
   caption?: string;
   /** Class-name prefix. Default `"bs"`. */
@@ -134,6 +142,7 @@ export function mountGrid(
     throw new Error(`grow.max (${grow.max}) is below grow.min (${grow.min})`);
   }
 
+  const spaceBubble = options.spaceBubble ?? Boolean(grow);
   const uniformChars = resolveCharset(options.charset ?? "letters");
   const slots: Slot[] = options.mask
     ? parseMask(options.mask)
@@ -255,6 +264,19 @@ export function mountGrid(
     stack.setAttribute("role", "radiogroup");
     stack.setAttribute("aria-label", `${caption || "Field"}, character ${cell}`);
 
+    if (spaceBubble) {
+      const space = doc.createElement("button");
+      space.type = "button";
+      space.className = `${prefix}-oval ${prefix}-space`;
+      space.dataset.cell = String(cell);
+      space.setAttribute("aria-label", `Space: blank column ${cell} and move on`);
+      const face = doc.createElement("span");
+      face.className = `${prefix}-face`;
+      face.textContent = "\u2423";
+      space.appendChild(face);
+      stack.appendChild(space);
+    }
+
     for (const char of chars) {
       const i = sheet.indexOf(char);
       const label = doc.createElement("label");
@@ -308,6 +330,9 @@ export function mountGrid(
   function syncDisabled(): void {
     for (const box of boxes.values()) box.disabled = sheet.disabled;
     for (const { input } of ovals.values()) input.disabled = sheet.disabled;
+    for (const el of field.querySelectorAll<HTMLButtonElement>(`.${prefix}-space`)) {
+      el.disabled = sheet.disabled;
+    }
     field.classList.toggle("is-disabled", sheet.disabled);
     field.setAttribute("aria-disabled", String(sheet.disabled));
   }
@@ -346,6 +371,14 @@ export function mountGrid(
    */
   function holdOpenFor(cell: number): void {
     if (grow && cell === sheet.questions && cell < grow.max) safeResize(cell + 1);
+  }
+
+  /** What the Space key does, callable from the tappable space control too. */
+  function spaceAt(cell: number): void {
+    sheet.clear(cell);
+    holdOpenFor(cell);
+    sheet.setCursor(cell + 1);
+    focusCell(cell + 1, false);
   }
 
   /** Drop a held-open trailing blank; content alone decides the size again. */
@@ -529,8 +562,18 @@ export function mountGrid(
 
   function onOvalKeyDown(event: Event): void {
     const key = event as KeyboardEvent;
-    if (!(key.target as HTMLElement).closest?.(`.${prefix}-stack`)) return;
-    const cell = Number((key.target as HTMLInputElement).dataset?.cell);
+    const target = key.target as HTMLElement;
+    if (!target.closest?.(`.${prefix}-stack`)) return;
+    const cell = Number((target as HTMLInputElement).dataset?.cell);
+    // The space control activates on Enter too, and must fire exactly once —
+    // never both natively and through handleKey.
+    if (target.classList?.contains(`${prefix}-space`)) {
+      if (key.key === " " || key.key === "Spacebar" || key.key === "Enter") {
+        key.preventDefault();
+        if (cell) spaceAt(cell);
+        return;
+      }
+    }
     if ((key.key === " " || key.key === "Spacebar") && cell) holdOpenFor(cell);
     // A masked cell only accepts its own characters, even though the model's
     // menu is the union of every cell's.
@@ -570,6 +613,13 @@ export function mountGrid(
   }
 
   function onClick(event: Event): void {
+    const space = (event.target as HTMLElement).closest?.(`.${prefix}-space`) as
+      | HTMLElement
+      | null;
+    if (space && (event as MouseEvent).detail > 0 && !sheet.disabled) {
+      spaceAt(Number(space.dataset.cell));
+      return;
+    }
     const input = (event.target as HTMLElement).closest?.("input[type=radio]") as
       | HTMLInputElement
       | null;

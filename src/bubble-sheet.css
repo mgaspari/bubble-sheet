@@ -279,3 +279,33 @@
   display: flex;
   gap: 3px;
 }
+
+/* The tappable space control: the pointer's Space key, a button in oval
+   clothing. Dashed, so it reads as a control rather than a markable value. */
+.bs-space {
+  padding: 0;
+  margin-bottom: 3px;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.bs-space .bs-face {
+  border-style: dashed;
+  border-width: 1.5px;
+  color: var(--bs-muted);
+}
+
+.bs-space:hover .bs-face {
+  background: rgb(0 0 0 / 7%);
+}
+
+.bs-space:focus-visible {
+  outline: none;
+}
+
+.bs-space:focus-visible .bs-face {
+  outline: 2px solid var(--bs-accent);
+  outline-offset: 2px;
+}

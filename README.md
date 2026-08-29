@@ -101,6 +101,7 @@ one column — the axes swap because the questions run sideways here
 | `charset` | `"letters"` | `"letters"`, `"digits"`, `"alphanumeric"`, or your own string/array |
 | `mask` | — | shape the field per position; see below |
 | `grow` | `false` | `true` or `{ min, max }`: the field grows as it is typed into |
+| `spaceBubble` | on for `grow` fields | a tappable space control atop each column; see below |
 | `caption` | — | visible label, also the accessible name |
 | `text` | — | initial text, one character per cell |
 | `name` | — | `name` for a hidden input carrying the text, for plain form posts |
@@ -152,6 +153,13 @@ collapses once the cursor leaves it. Backspace clears the current column in
 place; on an empty column it clears the one to the left — so at the end of the
 field each press erases exactly one character, and the field shrinks as it
 goes.
+
+Growing fields also render a dashed `␣` control at the top of each column —
+the pointer's Space key, for touch users who cannot otherwise grow the field
+past a word. It is a control, not a value: tapping it blanks the column and
+moves on, and nothing is stored. Force it on or off anywhere with
+`spaceBubble`; fixed fields default to off, since clicking a filled bubble
+already erases it and an untouched column already is a space.
 
 ## Keyboard
 
